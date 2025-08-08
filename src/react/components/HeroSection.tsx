@@ -32,16 +32,16 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold text-white tracking-tight mb-4 drop-shadow-lg">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-bold text-white tracking-tight mb-3 drop-shadow-lg">
             JOJUVO 2025
           </h1>
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-xl md:text-2xl text-gray-300"
+            className="text-lg sm:text-xl md:text-2xl text-gray-300 px-2"
           >
             Jornada Juvenil Vocacional, II Zona Pastoral, 2do decanato
           </motion.p>
@@ -52,15 +52,15 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="mb-12"
+          className="mb-8"
         >
-          <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-3xl mx-auto px-4">
             Un día para conectar con cientos de jóvenes católicos de CDMX que quieren transformar el mundo y llenar el cielo.
           </p>
         </motion.div>
 
         {/* Countdown Timer */}
-        <div className="mb-12">
+        <div className="mb-8">
           <CountdownTimer />
         </div>
 
@@ -69,11 +69,11 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.4 }}
-          className="mb-8"
+          className="mb-6"
         >
           <motion.button
             onClick={scrollToRegistration}
-            className="bg-golden-500 hover:bg-golden-600 text-white px-10 py-5 rounded-lg text-xl font-medium transition-colors duration-200 shadow-lg divine-glow-soft mr-4"
+            className="bg-golden-500 hover:bg-golden-600 text-white px-8 py-4 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft mr-4"
             whileHover={{ 
               scale: 1.05,
               boxShadow: "0 10px 25px rgba(212, 133, 26, 0.3)"
@@ -91,7 +91,7 @@ export function HeroSection() {
           transition={{ delay: 1.6 }}
           className="space-y-3"
         >
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-gray-300">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-gray-300 text-sm md:text-base">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
               <span>4 de octubre • 8:00 - 19:00hrs</span>
@@ -116,7 +116,7 @@ export function HeroSection() {
           >
             <motion.button
               onClick={scrollToRegistration}
-              className="bg-transparent border-2 border-golden-400 text-golden-400 hover:bg-golden-400 hover:text-white px-6 py-3 rounded-lg font-medium transition-all duration-200"
+              className="bg-transparent border-2 border-golden-400 text-golden-400 hover:bg-golden-400 hover:text-white px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
