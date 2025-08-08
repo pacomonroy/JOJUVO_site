@@ -3,25 +3,32 @@ on:
   push:
     branches: [ main ]
 
-# 👇 this is critical
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
       - run: npm run build
+
+      # Push /dist to the 'hostinger' branch (root)
       - name: Push dist to hostinger branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: hostinger
           folder: dist
           clean: true
-          token: ${{ secrets.GITHUB_TOKEN }}   # explicit, just to be safe
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Trigger Hostinger to pull that branch AFTER the push
+      - name: Trigger Hostinger webhook
+        run: curl -sS -X POST "${{ secrets.HOSTINGER_WEBHOOK }}"
