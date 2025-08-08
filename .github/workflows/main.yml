@@ -11,16 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
       - run: npm run build
 
-      # Push /dist to the 'hostinger' branch (root)
+      # Push dist to hostinger branch
       - name: Push dist to hostinger branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
@@ -29,6 +27,6 @@ jobs:
           clean: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Trigger Hostinger to pull that branch AFTER the push
+      # Trigger Hostinger to pull AFTER the push lands
       - name: Trigger Hostinger webhook
-        run: curl -sS -X POST "${{ secrets.HOSTINGER_WEBHOOK }}"
+        run: curl -fsSL -X POST "${{ secrets.HOSTINGER_WEBHOOK }}"
