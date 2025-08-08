@@ -11,7 +11,7 @@ export function ContactSection() {
     {
       icon: Mail,
       title: "Correo Electrónico",
-      info: "info@jojuvo.mx",
+      info: "info@jojuvo.com",
       description: "Escríbenos para cualquier consulta"
     },
     {
