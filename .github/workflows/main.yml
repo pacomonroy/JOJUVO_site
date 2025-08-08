@@ -17,8 +17,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-
-      # Push dist to hostinger branch
       - name: Push dist to hostinger branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
@@ -26,7 +24,3 @@ jobs:
           folder: dist
           clean: true
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Trigger Hostinger to pull AFTER the push lands
-      - name: Trigger Hostinger webhook
-        run: curl -fsSL -X POST "${{ secrets.HOSTINGER_WEBHOOK }}"
