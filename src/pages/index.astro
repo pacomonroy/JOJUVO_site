@@ -1,0 +1,9 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import App from "../react/App";
+const pageTitle = "JOJUVO 2025 — Jornada Juvenil Vocacional";
+const pageDescription = "Un día para conectar con cientos de jóvenes católicos en Expo Santa Fe, CDMX — 4 de octubre de 2025.";
+---
+<BaseLayout title={pageTitle} description={pageDescription}>
+  <App client:load />
+</BaseLayout>
