@@ -3,6 +3,10 @@ on:
   push:
     branches: [ main ]
 
+# 👇 this is critical
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,3 +24,4 @@ jobs:
           branch: hostinger
           folder: dist
           clean: true
+          token: ${{ secrets.GITHUB_TOKEN }}   # explicit, just to be safe
