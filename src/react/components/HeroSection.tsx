@@ -26,7 +26,7 @@ export function HeroSection() {
         </motion.div>
       </div>
       
-      <div className="max-w-5xl mx-auto px-6 text-center relative z-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-20">
         {/* Main JOJUVO branding */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -41,7 +41,7 @@ export function HeroSection() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-lg sm:text-xl md:text-2xl text-gray-300 px-2"
+            className="text-lg sm:text-xl md:text-2xl text-gray-300 px-6 sm:px-4 md:px-2"
           >
             Jornada Juvenil Vocacional, II Zona Pastoral, 2do decanato
           </motion.p>
@@ -54,7 +54,7 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.8 }}
           className="mb-8"
         >
-          <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-3xl mx-auto px-4">
+          <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-3xl mx-auto px-6 sm:px-8 md:px-4">
             Un día para conectar con cientos de jóvenes católicos de CDMX que quieren transformar el mundo y llenar el cielo.
           </p>
         </motion.div>
