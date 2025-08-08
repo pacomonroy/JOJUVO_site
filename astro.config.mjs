@@ -8,3 +8,5 @@ export default defineConfig({
   integrations: [react(), tailwind(), sitemap()],
   prefetch: true,
 });
+
+export default defineConfig({ site: 'https://yourdomain.com/sub', base: '/sub' });
