@@ -3,9 +3,15 @@ name: JSM (SD) → GitHub Issue + AI Triage (read-only)
 on:
   repository_dispatch:
     types: [jsm_ticket_created]
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: "Clave de JSM (p. ej. SD-1)"
+        required: false
+        type: string
 
 concurrency:
-  group: jsm-${{ github.event.client_payload.issue_key }}
+  group: jsm-${{ github.event.client_payload.issue_key || github.event.inputs.issue_key || 'manual' }}
   cancel-in-progress: false
 
 permissions:
@@ -23,23 +29,36 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout (read-only)
+      - name: "Checkout (read-only)"
         uses: actions/checkout@v4
         with:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Leer ticket de JSM (SD-xxxx)
+      - name: "Debug payload"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.info(`event: ${context.eventName}`);
+            core.info('payload:');
+            core.info(JSON.stringify(context.payload, null, 2));
+
+      - name: "Leer ticket de JSM (SD-xxxx)"
         id: jsm
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           ISSUE_KEY:      ${{ github.event.client_payload.issue_key }}
+          INPUT_ISSUE_KEY: ${{ github.event.inputs.issue_key }}
         run: |
           set -euo pipefail
-          test -n "${ISSUE_KEY:-}" || { echo "Falta client_payload.issue_key"; exit 1; }
-          AUTH=$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w0 || base64)
+          ISSUE_KEY="${ISSUE_KEY:-${INPUT_ISSUE_KEY:-}}"
+          test -n "${ISSUE_KEY:-}" || { echo "Falta issue_key"; exit 1; }
+
+          # Basic auth header (compatible con JSM/Atlassian Cloud)
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+
           curl -fsS \
             -H "Authorization: Basic $AUTH" \
             -H "Accept: application/json" \
@@ -48,16 +67,17 @@ jobs:
 
           jq -re '.fields' issue.json >/dev/null
 
-          echo "summary=$(jq -r '.fields.summary' issue.json)" >> "$GITHUB_OUTPUT"
+          echo "issue_key=$ISSUE_KEY"                                                  >> "$GITHUB_OUTPUT"
+          echo "summary=$(jq -r '.fields.summary' issue.json)"                          >> "$GITHUB_OUTPUT"
           echo "priority=$(jq -r '.fields.priority.name // \"Unspecified\"' issue.json)" >> "$GITHUB_OUTPUT"
           echo "reporter=$(jq -r '.fields.reporter.displayName // \"Unknown\"' issue.json)" >> "$GITHUB_OUTPUT"
-          echo "project=$(jq -r '.fields.project.key' issue.json)" >> "$GITHUB_OUTPUT"
-          echo "type=$(jq -r '.fields.issuetype.name' issue.json)" >> "$GITHUB_OUTPUT"
+          echo "project=$(jq -r '.fields.project.key' issue.json)"                      >> "$GITHUB_OUTPUT"
+          echo "type=$(jq -r '.fields.issuetype.name' issue.json)"                      >> "$GITHUB_OUTPUT"
 
           jq -r '.renderedFields.description // ""' issue.json > description.html
           jq -r '.fields.attachment // [] | .[] | [.filename,.content] | @tsv' issue.json > attachments.tsv || true
 
-      - name: Construir lista de adjuntos (enlaces JSM)
+      - name: "Construir lista de adjuntos (enlaces JSM)"
         id: att
         shell: bash
         run: |
@@ -70,7 +90,7 @@ jobs:
             echo "_Sin adjuntos_" > attachments.md
           fi
 
-      - name: Cargar contexto operativo (ops/context.md)
+      - name: "Cargar contexto operativo (ops/context.md)"
         id: ctx
         shell: bash
         run: |
@@ -78,14 +98,16 @@ jobs:
           if [ -f "ops/context.md" ]; then
             cp ops/context.md ops_context.md
           else
-            echo "No hay contexto adicional (ops/context.md ausente)." > ops_context.md
+            cat > ops_context.md <<'MD'
+No hay contexto adicional (ops/context.md ausente).
+MD
           fi
 
-      - name: Crear Issue en GitHub
+      - name: "Crear Issue en GitHub"
         id: gh_issue
         uses: actions/github-script@v7
         env:
-          ISSUE_KEY: ${{ github.event.client_payload.issue_key }}
+          ISSUE_KEY: ${{ steps.jsm.outputs.issue_key }}
           SUMMARY:   ${{ steps.jsm.outputs.summary }}
           PROJECT:   ${{ steps.jsm.outputs.project }}
           TYPE:      ${{ steps.jsm.outputs.type }}
@@ -121,7 +143,7 @@ jobs:
             });
             core.setOutput('number', data.number);
 
-      - name: SLA: etiquetas y fechas (horas habiles CDMX)
+      - name: "SLA: etiquetas y fechas (horas habiles CDMX)"
         id: sla
         uses: actions/github-script@v7
         env:
@@ -132,41 +154,46 @@ jobs:
           script: |
             function addBizHours(hours) {
               const tz = process.env.TZ || 'America/Mexico_City';
-              const isBizDay = d => { const w=d.getDay(); return w>=1 && w<=5; };
-              const start = new Date(new Date().toLocaleString('en-US',{timeZone:tz}));
-              const setHour = (d,h)=>{ d.setHours(h,0,0,0); return d; };
+              const isBizDay = d => { const w = d.getDay(); return w >= 1 && w <= 5; };
+              const start = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+              const setHour = (d, h) => { d.setHours(h, 0, 0, 0); return d; };
               let d = start;
-              if (d.getHours()<9) d=setHour(d,9);
-              if (d.getHours()>=18) { do { d.setDate(d.getDate()+1);} while(!isBizDay(d)); d=setHour(d,9); }
+              if (d.getHours() < 9) d = setHour(d, 9);
+              if (d.getHours() >= 18) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
               let remaining = hours;
-              while (remaining>0) {
-                if (!isBizDay(d)) { do { d.setDate(d.getDate()+1);} while(!isBizDay(d)); d=setHour(d,9); continue; }
+              while (remaining > 0) {
+                if (!isBizDay(d)) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); continue; }
                 const todayLeft = 18 - d.getHours();
                 const step = Math.min(remaining, todayLeft);
-                d.setHours(d.getHours()+step);
+                d.setHours(d.getHours() + step);
                 remaining -= step;
-                if (remaining>0) { do { d.setDate(d.getDate()+1);} while(!isBizDay(d)); d=setHour(d,9); }
+                if (remaining > 0) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
               }
               return d;
             }
             const pri = (process.env.PRIORITY || '').toUpperCase();
-            const map = { 'P1': {resp:3,res:5}, 'P2': {resp:6,res:8}, 'P3': {resp:9,res:27} };
-            const sev = pri.includes('CRIT') ? 'P1' : pri.includes('ALTA') ? 'P2' : 'P3';
+            const map = { 'P1': { resp: 3, res: 5 }, 'P2': { resp: 6, res: 8 }, 'P3': { resp: 9, res: 27 } };
+            const sev = pri.includes('CRIT') ? 'P1' : (pri.includes('ALTA') ? 'P2' : 'P3');
             const deadlines = map[sev];
             const respBy = addBizHours(deadlines.resp);
             const resoBy = addBizHours(deadlines.res);
-            const fmt = d => new Intl.DateTimeFormat('es-MX',{ timeZone: process.env.TZ, dateStyle:'medium', timeStyle:'short' }).format(d);
+            const fmt = d => new Intl.DateTimeFormat('es-MX', { timeZone: process.env.TZ, dateStyle: 'medium', timeStyle: 'short' }).format(d);
+
             await github.rest.issues.addLabels({
-              owner: context.repo.owner, repo: context.repo.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               issue_number: Number(process.env.ISSUE_NUMBER),
               labels: [`sev:${sev}`]
             });
+
             await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER),
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.ISSUE_NUMBER),
               body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
             });
 
-      - name: Preparar prompt para AI
+      - name: "Preparar prompt para AI"
         id: prep
         shell: bash
         run: |
@@ -178,7 +205,7 @@ jobs:
             echo; echo "### SLA"; echo "- L-V 09:00-18:00 (CDMX). P1: resp<=3h/reso<=5h; P2: <=6h/<=8h; P3: <=9h/<=27h"
           } > prompt.md
 
-      - name: Analisis con GitHub Models (AI)
+      - name: "Analisis con GitHub Models (AI)"
         id: ai
         uses: actions/ai-inference@v1
         with:
@@ -195,7 +222,7 @@ jobs:
             No inventes datos; si falta informacion, pide una checklist corta.
           input-file: prompt.md
 
-      - name: Comentar analisis AI en el Issue
+      - name: "Comentar analisis AI en el Issue"
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
@@ -205,12 +232,13 @@ jobs:
             const fs = require('fs');
             const body = fs.readFileSync(process.env.AI_MD_FILE,'utf8');
             await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               issue_number: Number(process.env.ISSUE_NUMBER),
               body
             });
 
-      - name: Extraer bloque JSON (para checklist publica)
+      - name: "Extraer bloque JSON (para checklist publica)"
         id: parse_ai
         shell: bash
         run: |
@@ -219,36 +247,40 @@ jobs:
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
-      - name: JSM comentario interno (analisis completo)
+      - name: "JSM comentario interno (analisis completo)"
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          ISSUE_KEY:      ${{ github.event.client_payload.issue_key }}
+          ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
         run: |
           set -euo pipefail
-          AUTH=$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w0 || base64)
-          MD=$(sed 's/\\/\\\\/g; s/"/\\"/g' "${{ steps.ai.outputs.response-file }}")
-          BODY=$(jq -n --arg md "$MD" '{body:$md, public:false}')
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "${{ steps.ai.outputs.response-file }}")"
+          BODY="$(jq -n --arg md "$MD" '{body:$md, public:false}')"
           curl -fsS -X POST \
             -H "Authorization: Basic $AUTH" \
             -H "Content-Type: application/json" \
             --data "$BODY" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
 
-      - name: JSM comentario publico (solo checklist, si aplica)
+      - name: "JSM comentario publico (solo checklist, si aplica)"
         if: ${{ steps.parse_ai.outputs.json != '' }}
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          ISSUE_KEY:      ${{ github.event.client_payload.issue_key }}
+          ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
         run: |
           set -euo pipefail
-          AUTH=$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w0 || base64)
-          reqs=$(jq -r '.replication_requirements // [] | map("- " + .) | join("\n")' ai.json)
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          reqs="$(jq -r '.replication_requirements // [] | map("- " + .) | join("\n")' ai.json)"
           if [ -n "$reqs" ]; then
             msg="Para avanzar mas rapido, por favor ayudanos con:\n${reqs}"
-            BODY=$(jq -n --arg md "$msg" '{body:$md, public:true}')
-            curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
+            BODY="$(jq -n --arg md "$msg" '{body:$md, public:true}')"
+            curl -fsS -X POST \
+              -H "Authorization: Basic $AUTH" \
+              -H "Content-Type: application/json" \
+              --data "$BODY" \
+              "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
           fi
