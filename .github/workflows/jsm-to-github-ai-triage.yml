@@ -97,19 +97,19 @@ jobs:
             const descHtml = fs.readFileSync('description.html','utf8');
             const atts = fs.readFileSync('attachments.md','utf8');
             const body = [
-              `### Origen: Jira Service Management (SD)`,
+              '### Origen: Jira Service Management (SD)',
               `- **Ticket:** [${process.env.ISSUE_KEY}](${process.env.JIRA_BASE_URL}/browse/${process.env.ISSUE_KEY})`,
               `- **Proyecto/Tipo:** ${process.env.PROJECT} / ${process.env.TYPE}`,
               `- **Prioridad (JSM):** ${process.env.PRIORITY}`,
               `- **Reportado por:** ${process.env.REPORTER}`,
-              ``,
-              `### Descripción (JSM renderizada)`,
+              '',
+              '### Descripción (JSM renderizada)',
               `<details><summary>Ver</summary>\n\n${descHtml}\n\n</details>`,
-              ``,
-              `### Adjuntos`,
+              '',
+              '### Adjuntos',
               atts,
-              ``,
-              `> Generado automáticamente desde JSM (SD).`
+              '',
+              '> Generado automáticamente desde JSM (SD).'
             ].join('\n');
             const title = `[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`;
             const { data } = await github.rest.issues.create({
@@ -121,7 +121,7 @@ jobs:
             });
             core.setOutput('number', data.number);
 
-      - name: SLA: etiquetas y fechas (horas hábiles CDMX)
+      - name: SLA: etiquetas y fechas (horas habiles CDMX)
         id: sla
         uses: actions/github-script@v7
         env:
@@ -156,16 +156,14 @@ jobs:
             const respBy = addBizHours(deadlines.resp);
             const resoBy = addBizHours(deadlines.res);
             const fmt = d => new Intl.DateTimeFormat('es-MX',{ timeZone: process.env.TZ, dateStyle:'medium', timeStyle:'short' }).format(d);
-
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: Number(process.env.ISSUE_NUMBER),
               labels: [`sev:${sev}`]
             });
-
             await github.rest.issues.createComment({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER),
-              body: `**SLA (horas hábiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h → **${fmt(respBy)}**\n- Resolución (${sev}): ${deadlines.res}h → **${fmt(resoBy)}**`
+              body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
             });
 
       - name: Preparar prompt para AI
@@ -174,13 +172,13 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "### Descripción (HTML)"; cat description.html
+            echo "### Descripcion (HTML)"; cat description.html
             echo; echo "### Adjuntos"; cat attachments.md
             echo; echo "### Contexto operativo"; cat ops_context.md
-            echo; echo "### SLA"; echo "- L–V 09:00–18:00 (CDMX). P1: resp≤3h/reso≤5h; P2: ≤6h/≤8h; P3: ≤9h/≤27h"
+            echo; echo "### SLA"; echo "- L-V 09:00-18:00 (CDMX). P1: resp<=3h/reso<=5h; P2: <=6h/<=8h; P3: <=9h/<=27h"
           } > prompt.md
 
-      - name: Análisis con GitHub Models (AI)
+      - name: Analisis con GitHub Models (AI)
         id: ai
         uses: actions/ai-inference@v1
         with:
@@ -188,16 +186,16 @@ jobs:
           system-prompt: |
             Eres un ingeniero de soporte senior. Devuelve EXACTAMENTE estas secciones en Markdown:
             ## Posible causa
-            ## Solución potencial
+            ## Solucion potencial
             ## Requisitos adicionales para replicar
-            ## Clasificación (Bug vs Cambio)
+            ## Clasificacion (Bug vs Cambio)
             ## Riesgos/Infra (WAF/VPN/Server)
             Al final agrega un bloque ```json``` con:
             {"cause":"...","solution":"...","replication_requirements":["..."],"classification":"bug|change","risk_notes":"..."}
-            No inventes datos; si falta información, pide una checklist corta.
+            No inventes datos; si falta informacion, pide una checklist corta.
           input-file: prompt.md
 
-      - name: Comentar análisis AI en el Issue
+      - name: Comentar analisis AI en el Issue
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
@@ -212,7 +210,7 @@ jobs:
               body
             });
 
-      - name: Extraer bloque JSON (para checklist pública)
+      - name: Extraer bloque JSON (para checklist publica)
         id: parse_ai
         shell: bash
         run: |
@@ -221,7 +219,7 @@ jobs:
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
-      - name: JSM comentario interno (análisis completo)
+      - name: JSM comentario interno (analisis completo)
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
@@ -238,7 +236,7 @@ jobs:
             --data "$BODY" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
 
-      - name: JSM comentario público (solo checklist, si aplica)
+      - name: JSM comentario publico (solo checklist, si aplica)
         if: ${{ steps.parse_ai.outputs.json != '' }}
         shell: bash
         env:
@@ -250,7 +248,7 @@ jobs:
           AUTH=$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w0 || base64)
           reqs=$(jq -r '.replication_requirements // [] | map("- " + .) | join("\n")' ai.json)
           if [ -n "$reqs" ]; then
-            msg="Para avanzar más rápido, por favor ayúdanos con:\n${reqs}"
+            msg="Para avanzar mas rapido, por favor ayudanos con:\n${reqs}"
             BODY=$(jq -n --arg md "$msg" '{body:$md, public:true}')
             curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
           fi
