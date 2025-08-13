@@ -40,7 +40,6 @@ jobs:
         with:
           script: |
             core.info(`event: ${context.eventName}`);
-            core.info('payload:');
             core.info(JSON.stringify(context.payload, null, 2));
 
       - name: "Read JSM ticket (SD-xxxx)"
@@ -56,7 +55,6 @@ jobs:
           ISSUE_KEY="${ISSUE_KEY:-${INPUT_ISSUE_KEY:-}}"
           test -n "${ISSUE_KEY:-}" || { echo "Missing issue_key"; exit 1; }
 
-          # Build Basic auth header (Atlassian Cloud)
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
 
           curl -fsS \
@@ -76,8 +74,17 @@ jobs:
             echo "type=$(jq -r '.fields.issuetype.name' issue.json)"
           } >> "$GITHUB_OUTPUT"
 
+          # HTML renderizado y adjuntos
           jq -r '.renderedFields.description // ""' issue.json > description.html
           jq -r '.fields.attachment // [] | .[] | [.filename,.content] | @tsv' issue.json > attachments.tsv || true
+
+      - name: "Fix relative links in description (avoid 404)"
+        id: fixdesc
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reescribe src="/..." y href="/..." a absolutos JIRA_BASE_URL
+          sed -E "s#(src|href)=\"\/#\\1=\"${JIRA_BASE_URL}/#g" description.html > description_fixed.html
 
       - name: "Build attachment list (JSM links)"
         id: att
@@ -116,7 +123,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const descHtml = fs.readFileSync('description.html','utf8');
+            const descHtml = fs.readFileSync('description_fixed.html','utf8'); // usar HTML reparado
             const atts = fs.readFileSync('attachments.md','utf8');
             const body = [
               '### Origen: Jira Service Management (SD)',
@@ -193,16 +200,42 @@ jobs:
               body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
             });
 
+      # ------- NUEVO: contexto del repositorio para el modelo -------
+      - name: "Build repo context (tree + keyword matches)"
+        id: repocontext
+        shell: bash
+        env:
+          SUMMARY: ${{ steps.jsm.outputs.summary }}
+        run: |
+          set -euo pipefail
+          # Palabras clave a partir del summary y una version "plana" de la descripcion
+          PLAIN_DESC="$(sed -E 's/<[^>]+>//g' description_fixed.html | tr -d '\r')"
+          TOKENS="$(printf "%s\n%s\n" "${SUMMARY:-}" "${PLAIN_DESC:-}" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | awk 'length>2' | sort -u | head -n 20 | paste -sd'|' -)"
+          : "${TOKENS:=.}"  # si no hay tokens, usa '.'
+
+          echo "### Repo tree (top 200)" > repo_context.md
+          (git ls-files 2>/dev/null || find . -type f) | head -n 200 >> repo_context.md
+
+          echo -e "\n### Keyword pattern\n${TOKENS}\n" >> repo_context.md
+          echo "### Matches (first 200 lines across source files)" >> repo_context.md
+
+          # Buscar coincidencias en archivos de codigo mas comunes (sin node_modules/.git)
+          find . -type d \( -name .git -o -name node_modules -o -name dist -o -name build \) -prune -o \
+            -type f \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.php" -o -name "*.html" -o -name "*.css" -o -name "*.scss" -o -name "*.vue" -o -name "*.json" -o -name "*.md" \) \
+            -print0 | xargs -0 -I{} sh -c 'grep -n -i -E "$0" "{}" | head -n 3' "${TOKENS}" | head -n 200 >> repo_context.md || true
+
       - name: "Prepare prompt for AI"
         id: prep
         shell: bash
         run: |
           set -euo pipefail
           {
-            echo "### Descripcion (HTML)"; cat description.html
+            echo "### Descripcion (HTML)"; cat description_fixed.html
             echo; echo "### Adjuntos"; cat attachments.md
             echo; echo "### Contexto operativo"; cat ops_context.md
+            echo; echo "### Repo context"; cat repo_context.md
             echo; echo "### SLA"; echo "- L-V 09:00-18:00 (CDMX). P1: resp<=3h/reso<=5h; P2: <=6h/<=8h; P3: <=9h/<=27h"
+            echo; echo "### Labels permitidas"; echo "bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix"
           } > prompt.md
 
       - name: "AI analysis (GitHub Models)"
@@ -218,8 +251,10 @@ jobs:
             ## Clasificacion (Bug vs Cambio)
             ## Riesgos/Infra (WAF/VPN/Server)
             Al final agrega un bloque ```json``` con:
-            {"cause":"...","solution":"...","replication_requirements":["..."],"classification":"bug|change","risk_notes":"..."}
-            No inventes datos; si falta informacion, pide una checklist corta.
+            {"cause":"...","solution":"...","replication_requirements":["..."],"classification":"bug|change","risk_notes":"...","labels":["bug","question"]}
+            Donde "labels" es un arreglo con cero o mas etiquetas elegidas UNICAMENTE del siguiente conjunto:
+            ["bug","documentation","duplicate","enhancement","good first issue","help wanted","invalid","question","wontfix"].
+            Si faltan datos, pide una checklist corta.
           prompt-file: prompt.md
           max-tokens: 800
 
@@ -239,7 +274,7 @@ jobs:
               body
             });
 
-      - name: "Extract JSON for public checklist"
+      - name: "Extract JSON for public checklist and labels"
         id: parse_ai
         shell: bash
         run: |
@@ -247,6 +282,38 @@ jobs:
           awk '/```json/{flag=1;next}/```/{flag=0}flag' "${{ steps.ai.outputs.response-file }}" > ai.json || true
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
+
+      - name: "Apply AI labels (only if existing in repo)"
+        if: ${{ steps.parse_ai.outputs.json != '' }}
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
+          AI_JSON: ${{ steps.parse_ai.outputs.json }}
+        with:
+          script: |
+            const payload = JSON.parse(process.env.AI_JSON || '{}');
+            const wanted = Array.isArray(payload.labels) ? payload.labels : [];
+            if (!wanted.length) {
+              core.info('No labels suggested by AI.');
+            } else {
+              const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({
+                owner: context.repo.owner, repo: context.repo.repo, per_page: 200
+              });
+              const existing = new Set(repoLabels.map(l => l.name.toLowerCase()));
+              const toApply = [...new Set(wanted.map(s => String(s).trim()))]
+                .filter(Boolean)
+                .filter(s => existing.has(s.toLowerCase()));
+              if (toApply.length) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: Number(process.env.ISSUE_NUMBER),
+                  labels: toApply
+                });
+                core.info(`Applied labels: ${toApply.join(', ')}`);
+              } else {
+                core.info('AI suggested labels that do not exist in repo. Skipping.');
+              }
+            }
 
       - name: "JSM internal comment (full analysis)"
         shell: bash
