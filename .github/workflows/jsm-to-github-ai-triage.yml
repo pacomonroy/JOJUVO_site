@@ -1,4 +1,4 @@
-name: "JSM SD → GitHub Issue + AI Triage (agent-ready, net-aware, read-only)"
+name: "JSM SD -> GitHub Issue + AI Triage (agent-ready, net-aware, read-only)"
 
 on:
   repository_dispatch:
@@ -254,23 +254,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # base from AI arrays
-          jq -r '.replication_requirements_user // [] | .[] | "- [ ] " + .' ai.json > user_ck.md || echo > user_ck.md
-          jq -r '.replication_requirements_it   // [] | .[] | "- [ ] " + .' ai.json > it_ck.md   || echo > it_ck.md
-          # extra friendly checklist if Cliente/Red
+          # desde AI
+          jq -r '.replication_requirements_user // [] | .[] | "- [ ] " + .' ai.json > user_ck.md || true
+          jq -r '.replication_requirements_it   // [] | .[] | "- [ ] " + .' ai.json > it_ck.md   || true
+          # si layer es Cliente/Red, agrega checklist amigable sin heredocs
           LAYER="$(jq -r '.layer // ""' ai.json)"
           if echo "$LAYER" | grep -qi "Cliente/Red"; then
-            cat >> user_ck.md <<'MD'
-- [ ] Probar sin VPN/Proxy y sin bloqueadores de anuncios
-- [ ] Probar desde red movil (datos) o otra red WiFi
-- [ ] Probar en modo incognito y otro navegador
-- [ ] Captura de pantalla COMPLETA (incluye barra de direcciones y hora del sistema)
-- [ ] Confirmar URL exacta y pasos previos al error
-MD
+            printf "%s\n" "- [ ] Probar sin VPN/Proxy y sin bloqueadores de anuncios" >> user_ck.md
+            printf "%s\n" "- [ ] Probar desde red movil (datos) o otra red WiFi" >> user_ck.md
+            printf "%s\n" "- [ ] Probar en modo incognito y en otro navegador" >> user_ck.md
+            printf "%s\n" "- [ ] Captura de pantalla COMPLETA (incluye barra de direcciones y hora del sistema)" >> user_ck.md
+            printf "%s\n" "- [ ] Confirmar URL exacta y pasos previos al error" >> user_ck.md
           fi
-          # defaults if empty
-          [ -s user_ck.md ] || echo "- [ ] Screenshot de pantalla completa" > user_ck.md
-          [ -s it_ck.md   ] || echo "- [ ] Confirmar si hay mantenimiento/implantacion en servidor o WAF" > it_ck.md
+          # defaults si quedaron vacios
+          [ -s user_ck.md ] || printf "%s\n" "- [ ] Screenshot de pantalla completa" > user_ck.md
+          [ -s it_ck.md   ] || printf "%s\n" "- [ ] Confirmar si hay mantenimiento o cambios en servidor/WAF" > it_ck.md
 
       - name: "Compute SLA (biz hours CDMX)"
         id: sla
@@ -314,38 +312,27 @@ MD
         id: create_issue
         uses: actions/github-script@v7
         env:
-          ISSUE_KEY:    ${{ steps.jsm.outputs.issue_key }}
-          SUMMARY:      ${{ steps.jsm.outputs.summary }}
-          PROJECT:      ${{ steps.jsm.outputs.project }}
-          TYPE:         ${{ steps.jsm.outputs.type }}
-          PRIORITY:     ${{ steps.jsm.outputs.priority }}
-          REPORTER:     ${{ steps.jsm.outputs.reporter }}
-          SEV_LABEL:    ${{ steps.sla.outputs.sev }}
-          RESP_DEADLINE:${{ steps.sla.outputs.resp }}
-          RESO_DEADLINE:${{ steps.sla.outputs.reso }}
-          AI_JSON:      ${{ steps.parse_ai.outputs.json }}
+          ISSUE_KEY:     ${{ steps.jsm.outputs.issue_key }}
+          SUMMARY:       ${{ steps.jsm.outputs.summary }}
+          PROJECT:       ${{ steps.jsm.outputs.project }}
+          TYPE:          ${{ steps.jsm.outputs.type }}
+          PRIORITY:      ${{ steps.jsm.outputs.priority }}
+          REPORTER:      ${{ steps.jsm.outputs.reporter }}
+          SEV_LABEL:     ${{ steps.sla.outputs.sev }}
+          RESP_DEADLINE: ${{ steps.sla.outputs.resp }}
+          RESO_DEADLINE: ${{ steps.sla.outputs.reso }}
+          AI_JSON:       ${{ steps.parse_ai.outputs.json }}
+          AI_MD_FILE:    ${{ steps.ai.outputs.response-file }}
         with:
           script: |
             const fs = require('fs');
             const descHtml = fs.readFileSync('description_fixed.html','utf8');
             const atts = fs.readFileSync('attachments.md','utf8');
-            const aiMd = fs.readFileSync(process.env.GITHUB_WORKSPACE + '/'+ process.env['GITHUB_ACTION_PATH'] ?? '', 'utf8'); // not used
-            const aiMdFile = process.env['GITHUB_STEP_SUMMARY']; // not used
-            const aiMdBody = fs.readFileSync(process.env['GITHUB_WORKSPACE'] + '/'+ 'prompt.md' , 'utf8'); // not used
-            const aiRendered = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/` + `${process.env['GITHUB_ACTION']?'':''}`, 'utf8'); // placeholder
-            const aiOut = fs.readFileSync(process.env.AI_RESPONSE_FILE || (process.env.AI_MD_FILE || ''), 'utf8', (e)=>''); // compat
-            const aiFile = process.env.AI_MD_FILE || `${process.env.GITHUB_WORKSPACE}/_ai.md`;
-            let aiMdText = '';
-            try { aiMdText = fs.readFileSync(process.env.AI_MD_FILE,'utf8'); } catch(e) { aiMdText = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/_temp_ai_response.md`,'utf8', (e)=>''); }
-            if (!aiMdText) { aiMdText = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/../_actions_output/response.md`,'utf8', (e)=>''); }
-            // fallback: read from action output path
-            try { aiMdText = fs.readFileSync(process.env['ACTIONS_AI_INFERENCE_RESPONSE_FILE'] || '', 'utf8'); } catch(e) {}
-
-            // Read checklists
+            const aiMd = fs.readFileSync(process.env.AI_MD_FILE,'utf8');
             const userCk = fs.readFileSync('user_ck.md','utf8');
             const itCk   = fs.readFileSync('it_ck.md','utf8');
+            const aiJson = JSON.parse(process.env.AI_JSON || '{}');
 
-            // Compose Issue body
             const head = [
               '### Origen: Jira Service Management (SD)',
               `- **Ticket:** [${process.env.ISSUE_KEY}](${process.env.JIRA_BASE_URL}/browse/${process.env.ISSUE_KEY})`,
@@ -360,11 +347,8 @@ MD
               atts,
               '',
               '---',
-              '## Analisis de IA',
+              '## Analisis de IA'
             ].join('\n');
-
-            const aiMd = fs.readFileSync(process.env.AI_MD_FILE,'utf8');
-            const aiJson = JSON.parse(process.env.AI_JSON || '{}');
 
             const reqs = [
               '## Requisitos adicionales para replicar',
@@ -380,20 +364,25 @@ MD
               `- Resolucion: **${process.env.RESO_DEADLINE}**`
             ].join('\n');
 
-            // Labels: from-jsm, triage, agent-ready, sev:P?, + AI labels que existan
-            const wanted = Array.isArray(aiJson.labels) ? aiJson.labels : [];
-            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({ owner: context.repo.owner, repo: context.repo.repo, per_page: 200 });
-            const exist = new Set(repoLabels.map(l => l.name.toLowerCase()));
-            const toApply = [...new Set(wanted.map(s => String(s).trim()))].filter(Boolean).filter(s => exist.has(s.toLowerCase()));
+            const body = [head, aiMd, reqs].join('\n\n');
 
-            const create = await github.rest.issues.create({
+            // Labels sugeridas por IA (si existen)
+            const wanted = Array.isArray(aiJson.labels) ? aiJson.labels : [];
+            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, per_page: 200
+            });
+            const existing = new Set(repoLabels.map(l => l.name.toLowerCase()));
+            const extra = [...new Set(wanted.map(s => String(s).trim()))]
+              .filter(Boolean).filter(s => existing.has(s.toLowerCase()));
+
+            const { data } = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`,
-              body: [head, aiMd, reqs].join('\n\n'),
-              labels: ['from-jsm','triage','agent-ready', process.env.SEV_LABEL, ...toApply]
+              body,
+              labels: ['from-jsm','triage','agent-ready', process.env.SEV_LABEL, ...extra]
             });
-            core.setOutput('number', create.data.number);
+            core.setOutput('number', data.number);
             core.setOutput('layer', aiJson.layer || '');
 
       - name: "JSM internal comment (full AI)"
@@ -402,10 +391,11 @@ MD
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
+          AI_MD_FILE:     ${{ steps.ai.outputs.response-file }}
         run: |
           set -euo pipefail
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
-          MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "${{ steps.ai.outputs.response-file }}")"
+          MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "$AI_MD_FILE")"
           BODY="$(jq -n --arg md "$MD" '{body:$md, public:false}')"
           curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" --data "$BODY" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
