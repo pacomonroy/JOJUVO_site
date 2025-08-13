@@ -6,6 +6,7 @@ import { RegistrationSection } from './components/RegistrationSection'
 import { ContactSection } from './components/ContactSection'
 import { Footer } from './components/Footer'
 import { DivineParticles } from './components/DivineParticles'
+import { FloatingBuyButton } from './components/FloatingBuyButton'
 
 export default function App() {
   return (
@@ -22,6 +23,9 @@ export default function App() {
         <ContactSection />
       </main>
       <Footer />
+      
+      {/* Floating buy button - 9th button */}
+      <FloatingBuyButton />
     </div>
   )
 }
