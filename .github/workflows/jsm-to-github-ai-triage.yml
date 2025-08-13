@@ -220,7 +220,8 @@ jobs:
             Al final agrega un bloque ```json``` con:
             {"cause":"...","solution":"...","replication_requirements":["..."],"classification":"bug|change","risk_notes":"..."}
             No inventes datos; si falta informacion, pide una checklist corta.
-          input-file: prompt.md
+          prompt-file: prompt.md
+          max-tokens: 800
 
       - name: "Post AI comment in Issue"
         uses: actions/github-script@v7
