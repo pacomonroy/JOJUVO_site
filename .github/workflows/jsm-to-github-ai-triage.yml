@@ -1,4 +1,4 @@
-name: "JSM SD to GitHub Issue + AI Triage (agent-ready, read-only)"
+name: "JSM SD to GitHub Issue + AI Triage (agent-ready, net-aware, read-only)"
 
 on:
   repository_dispatch:
@@ -26,7 +26,7 @@ env:
 jobs:
   ingest-triage:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
 
     steps:
       - name: "Checkout (read-only)"
@@ -74,19 +74,108 @@ jobs:
             echo "type=$(jq -r '.fields.issuetype.name' issue.json)"
           } >> "$GITHUB_OUTPUT"
 
+          # HTML renderizado y adjuntos
           jq -r '.renderedFields.description // ""' issue.json > description.html
-          jq -r '.fields.attachment // [] | .[] | [.filename,.content] | @tsv' issue.json > attachments.tsv || true
+          jq -r '.fields.attachment // [] | .[] | [.filename,.content,.mimeType] | @tsv' issue.json > attachments.tsv || true
 
-      - name: "Fix relative links in description (avoid 404)"
+      - name: "Fix description: absolute links and remove inline <img>"
         run: |
           set -euo pipefail
-          sed -E "s#(src|href)=\"\/#\\1=\"${JIRA_BASE_URL}/#g" description.html > description_fixed.html
+          # Absolutiza rutas relativas
+          sed -E "s#(src|href)=\"\/#\\1=\"${JIRA_BASE_URL}/#g" description.html > description_abs.html
+          # Reemplaza <img ...> por enlaces para evitar 404 embebido
+          perl -0777 -pe 's#<img[^>]+src="([^"]+)"[^>]*>#\[Imagen JSM\]\($1\)#gi' description_abs.html > description_fixed.html
+
+      - name: "Install tools (dnsutils, tesseract, jq already present)"
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y dnsutils tesseract-ocr
+
+      - name: "Download image attachments + OCR"
+        id: ocr
+        shell: bash
+        env:
+          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          mkdir -p attachments ocr
+          : > ocr/ocr.txt
+          while IFS=$'\t' read -r NAME URL MIME; do
+            case "$MIME" in
+              image/*)
+                OUT="attachments/${NAME}"
+                curl -fsS -H "Authorization: Basic $AUTH" -o "$OUT" "$URL" || continue
+                tesseract "$OUT" "ocr/${NAME}" -l spa+eng --psm 6 >/dev/null 2>&1 || true
+                [ -f "ocr/${NAME}.txt" ] && { echo "--- ${NAME} ---" >> ocr/ocr.txt; cat "ocr/${NAME}.txt" >> ocr/ocr.txt; echo >> ocr/ocr.txt; }
+                ;;
+            esac
+          done < attachments.tsv
+          if [ ! -s ocr/ocr.txt ]; then echo "No OCR text" > ocr/ocr.txt; fi
+          echo "ocr_file=ocr/ocr.txt" >> "$GITHUB_OUTPUT"
+
+      - name: "Detect site hostname (from secrets/context/repo/desc/OCR)"
+        id: host
+        shell: bash
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}   # opcional: configura JOJUVO prod aquí
+        run: |
+          set -euo pipefail
+          PICK=""
+          # 1) Secrets.SITE_URL
+          if [ -n "${SITE_URL:-}" ]; then PICK="$SITE_URL"; fi
+          # 2) ops/context.md (linea con http/https)
+          if [ -z "$PICK" ] && grep -Eo 'https?://[^ )"]+' -m1 ops/context.md >/dev/null 2>&1; then
+            PICK="$(grep -Eo 'https?://[^ )"]+' -m1 ops/context.md)"
+          fi
+          # 3) repo files (config tipicas)
+          if [ -z "$PICK" ]; then
+            PICK="$(grep -RhoE 'https?://[a-zA-Z0-9.-]+\.[a-z]{2,}[^" ]*' --include='*.{ts,tsx,js,jsx,json,md,astro,php,html}' -m1 || true)"
+          fi
+          # 4) description u OCR
+          if [ -z "$PICK" ]; then
+            PICK="$(grep -Eo 'https?://[^ )"]+' -m1 description_fixed.html || true)"
+          fi
+          if [ -z "$PICK" ]; then
+            PICK="$(grep -Eo 'https?://[^ ]+' -m1 ocr/ocr.txt || true)"
+          fi
+          # Fallback manual (solo host)
+          HOST="$(echo "$PICK" | sed -E 's#https?://##; s#/.*##; s/[^a-zA-Z0-9\.\-].*//')"
+          if [ -z "$HOST" ]; then HOST="jojuvo.com"; fi
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "url_guess=$PICK" >> "$GITHUB_OUTPUT"
+
+      - name: "Network diagnostics (DNS/TLS/HTTP)"
+        id: net
+        shell: bash
+        env:
+          HOST: ${{ steps.host.outputs.host }}
+        run: |
+          set -euo pipefail
+          : > netdiag.md
+          echo "## Network diagnostics for $HOST" >> netdiag.md
+          echo "### DNS" >> netdiag.md
+          { dig +short A "$HOST"; dig +short AAAA "$HOST"; } | sed 's/^/- /' >> netdiag.md || true
+
+          echo -e "\n### TLS (dates, issuer, subject)" >> netdiag.md
+          timeout 10 bash -lc 'echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null | openssl x509 -noout -dates -issuer -subject' \
+            | sed 's/^/  /' >> netdiag.md || echo "  (TLS check failed)" >> netdiag.md
+
+          echo -e "\n### HTTP HEAD timings" >> netdiag.md
+          curl -I --silent --show-error --connect-timeout 8 --max-time 15 "https://$HOST/" -w "\ncode:%{http_code} ip:%{remote_ip} t_connect:%{time_connect}s t_ttfb:%{time_starttransfer}s\n" \
+            -o >(tee headers.txt >/dev/null) >> netdiag.md || echo "Request failed (timeout/conn error)" >> netdiag.md
+
+          if [ -f headers.txt ]; then
+            echo -e "\n### Response headers (subset)" >> netdiag.md
+            grep -E '^(server:|cf-|x-litespeed|x-cache|via:|date:|content-type:|strict-transport-security:)' -i headers.txt | sed 's/^/  /' >> netdiag.md || true
+          fi
 
       - name: "Build attachment list (JSM links)"
         run: |
           set -euo pipefail
           if [ -s attachments.tsv ]; then
-            while IFS=$'\t' read -r NAME URL; do
+            while IFS=$'\t' read -r NAME URL MIME; do
               printf -- "- [%s](%s)\n" "$NAME" "$URL"
             done < attachments.tsv > attachments.md
           else
@@ -182,7 +271,7 @@ jobs:
               body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
             });
 
-      # ------ Contexto del repo para el agente (ligero y seguro) ------
+      # ------- Repo context + net signals para el prompt -------
       - name: "Build repo context (tree + keyword matches)"
         id: repocontext
         shell: bash
@@ -193,18 +282,13 @@ jobs:
           PLAIN_DESC="$(sed -E 's/<[^>]+>//g' description_fixed.html | tr -d '\r')"
           TOKENS="$(printf "%s\n%s\n" "${SUMMARY:-}" "${PLAIN_DESC:-}" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | awk 'length>2' | sort -u | head -n 20 | paste -sd'|' -)"
           : "${TOKENS:=.}"
-
           echo "### Repo tree (top 200)" > repo_context.md
           (git ls-files 2>/dev/null || find . -type f) | head -n 200 >> repo_context.md
-
           echo -e "\n### Keyword pattern\n${TOKENS}\n" >> repo_context.md
           echo "### Matches (first 200 lines across source files)" >> repo_context.md
-
           find . -type d \( -name .git -o -name node_modules -o -name dist -o -name build \) -prune -o \
             -type f \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.php" -o -name "*.html" -o -name "*.css" -o -name "*.scss" -o -name "*.vue" -o -name "*.json" -o -name "*.md" \) \
             -print0 | xargs -0 -I{} sh -c 'grep -n -i -E "$0" "{}" | head -n 3' "${TOKENS}" | head -n 200 >> repo_context.md || true
-
-          # Comandos del proyecto (package.json/composer.json si existen)
           {
             echo ""
             echo "### Project commands"
@@ -213,21 +297,18 @@ jobs:
               jq -r '.scripts // {}' package.json
               echo "\`\`\`"
             fi
-            if [ -f composer.json ]; then
-              echo "\`\`\`json"
-              jq -r '.scripts // {}' composer.json
-              echo "\`\`\`"
-            fi
           } >> repo_context.md
 
-      # ------------------- Triage inicial con modelos ------------------
-      - name: "Prepare prompt for AI"
+      - name: "Prepare prompt for AI (now with OCR + NetDiag)"
         id: prep
         shell: bash
         run: |
           set -euo pipefail
           {
             echo "### Descripcion (HTML)"; cat description_fixed.html
+            echo; echo "### OCR de imagenes (si hubo)"; cat ocr/ocr.txt
+            echo; echo "### Network diagnostics"; cat netdiag.md
+            echo; echo "### Host detectado"; echo "${{ steps.host.outputs.host }}  (origen: ${{ steps.host.outputs.url_guess || 'heuristica' }})"
             echo; echo "### Adjuntos"; cat attachments.md
             echo; echo "### Contexto operativo"; cat ops_context.md
             echo; echo "### Repo context"; cat repo_context.md
@@ -235,24 +316,28 @@ jobs:
             echo; echo "### Labels permitidas"; echo "bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix"
           } > prompt.md
 
-      - name: "AI analysis (GitHub Models)"
+      - name: "AI analysis (layered triage)"
         id: ai
         uses: actions/ai-inference@v1
         with:
           model: openai/gpt-4o-mini
           system-prompt: |
-            Eres un ingeniero de soporte senior. Devuelve EXACTAMENTE estas secciones en Markdown:
+            Actua como ingeniero de soporte senior. Usa señales de OCR (capturas), diagnosticos de red (DNS/TLS/HTTP) y contexto del repo/hosting.
+            Clasifica por CAPA y prioriza causas de red cuando haya timeouts, fallos de TLS o DNS.
+            Devuelve EXACTAMENTE en Markdown:
+            ## Clasificacion por capa
+            - Capa sospechosa: (Cliente/Red | DNS/CDN | WAF/Seguridad | Servidor/Hosting | Aplicacion/Codigo)
+            - Evidencia clave (bullet list, max 5)
+            - Confianza (baja/media/alta)
             ## Posible causa
             ## Solucion potencial
             ## Requisitos adicionales para replicar
-            ## Clasificacion (Bug vs Cambio)
             ## Riesgos/Infra (WAF/VPN/Server)
             Al final agrega un bloque ```json``` con:
-            {"cause":"...","solution":"...","replication_requirements":["..."],"classification":"bug|change","risk_notes":"...","labels":["bug","question"]}
-            Elige labels UNICAMENTE de:
-            ["bug","documentation","duplicate","enhancement","good first issue","help wanted","invalid","question","wontfix"].
+            {"layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo","cause":"...","solution":"...","replication_requirements":["..."],"risk_notes":"...","labels":["bug","question"],"confidence":"baja|media|alta"}
+            Regla: Si OCR contiene mensajes como ERR_CONNECTION_TIMED_OUT/ERR_NAME_NOT_RESOLVED o el netdiag muestra timeout/TLS expirado/DNS vacio, favorece capas de Red/DNS/WAF/Hosting por encima de Aplicacion/Codigo.
           prompt-file: prompt.md
-          max-tokens: 800
+          max-tokens: 900
 
       - name: "Post AI comment in Issue"
         uses: actions/github-script@v7
@@ -296,8 +381,45 @@ jobs:
               await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER), labels: toApply });
             }
 
-      # -------------- Comentario Agent-Ready para el Coding Agent ---------------
-      - name: "Post Agent-Ready brief"
+      - name: "JSM internal comment (full analysis)"
+        shell: bash
+        env:
+          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
+        run: |
+          set -euo pipefail
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "${{ steps.ai.outputs.response-file }}")"
+          BODY="$(jq -n --arg md "$MD" '{body:$md, public:false}')"
+          curl -fsS -X POST \
+            -H "Authorization: Basic $AUTH" \
+            -H "Content-Type: application/json" \
+            --data "$BODY" \
+            "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
+
+      - name: "JSM public comment (checklist only, if any)"
+        if: ${{ steps.parse_ai.outputs.json != '' }}
+        shell: bash
+        env:
+          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
+        run: |
+          set -euo pipefail
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          reqs="$(jq -r '.replication_requirements // [] | map("- " + .) | join("\n")' ai.json)"
+          if [ -n "$reqs" ]; then
+            msg="Para avanzar mas rapido, por favor ayudanos con:\n${reqs}"
+            BODY="$(jq -n --arg md "$msg" '{body:$md, public:true}')"
+            curl -fsS -X POST \
+              -H "Authorization: Basic $AUTH" \
+              -H "Content-Type: application/json" \
+              --data "$BODY" \
+              "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
+          fi
+
+      - name: "Agent-Ready brief (unchanged)"
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
@@ -319,22 +441,17 @@ jobs:
               '- No external network calls except package registries allowed by repo policy.',
               '- Respect Hostinger/LSWS, WAF/CDN rules and caching notes in ops/context.md.',
               '',
-              '**Acceptance Criteria (edit as needed)**',
-              '- Reproduce the issue locally or describe why not reproducible.',
-              '- Implement fix or content change + tests (unit or lightweight checks).',
-              '- No regressions on other pages; build passes.',
+              '**Acceptance Criteria**',
+              '- Reproduce or explain why not reproducible.',
+              '- Implement fix/content change + sanity checks.',
+              '- No regressions; build passes.',
               '- Include rollback notes and risk assessment.',
-              '',
-              '**How to run**',
-              'See "Project commands" in Repo context below. If missing, add a minimal script to run/build under a new PR.',
               '',
               '**Repo context (summary)**',
               '<details><summary>Open</summary>',
               '',
               repoCtx,
               '',
-              '</details>',
-              '',
-              '> To start Copilot coding agent: in this issue, click **Use Copilot** / **Assign to Copilot**. Copilot will plan, create a branch and PR, run tests and iterate on review feedback.',              
+              '</details>'
             ].join('\n');
             await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER), body });
