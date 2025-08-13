@@ -1,4 +1,4 @@
-name: JSM (SD) → GitHub Issue + AI Triage (read-only)
+name: "JSM SD to GitHub Issue + AI Triage (read-only)"
 
 on:
   repository_dispatch:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       issue_key:
-        description: "Clave de JSM (p. ej. SD-1)"
+        description: "JSM key (e.g. SD-1)"
         required: false
         type: string
 
@@ -43,7 +43,7 @@ jobs:
             core.info('payload:');
             core.info(JSON.stringify(context.payload, null, 2));
 
-      - name: "Leer ticket de JSM (SD-xxxx)"
+      - name: "Read JSM ticket (SD-xxxx)"
         id: jsm
         shell: bash
         env:
@@ -54,9 +54,9 @@ jobs:
         run: |
           set -euo pipefail
           ISSUE_KEY="${ISSUE_KEY:-${INPUT_ISSUE_KEY:-}}"
-          test -n "${ISSUE_KEY:-}" || { echo "Falta issue_key"; exit 1; }
+          test -n "${ISSUE_KEY:-}" || { echo "Missing issue_key"; exit 1; }
 
-          # Basic auth header (compatible con JSM/Atlassian Cloud)
+          # Build Basic auth header (Atlassian Cloud)
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
 
           curl -fsS \
@@ -67,17 +67,19 @@ jobs:
 
           jq -re '.fields' issue.json >/dev/null
 
-          echo "issue_key=$ISSUE_KEY"                                                  >> "$GITHUB_OUTPUT"
-          echo "summary=$(jq -r '.fields.summary' issue.json)"                          >> "$GITHUB_OUTPUT"
-          echo "priority=$(jq -r '.fields.priority.name // \"Unspecified\"' issue.json)" >> "$GITHUB_OUTPUT"
-          echo "reporter=$(jq -r '.fields.reporter.displayName // \"Unknown\"' issue.json)" >> "$GITHUB_OUTPUT"
-          echo "project=$(jq -r '.fields.project.key' issue.json)"                      >> "$GITHUB_OUTPUT"
-          echo "type=$(jq -r '.fields.issuetype.name' issue.json)"                      >> "$GITHUB_OUTPUT"
+          {
+            echo "issue_key=$ISSUE_KEY"
+            echo "summary=$(jq -r '.fields.summary' issue.json)"
+            echo "priority=$(jq -r '.fields.priority.name // \"Unspecified\"' issue.json)"
+            echo "reporter=$(jq -r '.fields.reporter.displayName // \"Unknown\"' issue.json)"
+            echo "project=$(jq -r '.fields.project.key' issue.json)"
+            echo "type=$(jq -r '.fields.issuetype.name' issue.json)"
+          } >> "$GITHUB_OUTPUT"
 
           jq -r '.renderedFields.description // ""' issue.json > description.html
           jq -r '.fields.attachment // [] | .[] | [.filename,.content] | @tsv' issue.json > attachments.tsv || true
 
-      - name: "Construir lista de adjuntos (enlaces JSM)"
+      - name: "Build attachment list (JSM links)"
         id: att
         shell: bash
         run: |
@@ -87,10 +89,10 @@ jobs:
               printf -- "- [%s](%s)\n" "$NAME" "$URL"
             done < attachments.tsv > attachments.md
           else
-            echo "_Sin adjuntos_" > attachments.md
+            printf "_Sin adjuntos_\n" > attachments.md
           fi
 
-      - name: "Cargar contexto operativo (ops/context.md)"
+      - name: "Load ops context (ops/context.md)"
         id: ctx
         shell: bash
         run: |
@@ -98,12 +100,10 @@ jobs:
           if [ -f "ops/context.md" ]; then
             cp ops/context.md ops_context.md
           else
-            cat > ops_context.md <<'MD'
-No hay contexto adicional (ops/context.md ausente).
-MD
+            printf "%s\n" "No hay contexto adicional (ops/context.md ausente)." > ops_context.md
           fi
 
-      - name: "Crear Issue en GitHub"
+      - name: "Create GitHub Issue"
         id: gh_issue
         uses: actions/github-script@v7
         env:
@@ -125,13 +125,13 @@ MD
               `- **Prioridad (JSM):** ${process.env.PRIORITY}`,
               `- **Reportado por:** ${process.env.REPORTER}`,
               '',
-              '### Descripción (JSM renderizada)',
+              '### Descripcion (JSM renderizada)',
               `<details><summary>Ver</summary>\n\n${descHtml}\n\n</details>`,
               '',
               '### Adjuntos',
               atts,
               '',
-              '> Generado automáticamente desde JSM (SD).'
+              '> Generado automaticamente desde JSM (SD).'
             ].join('\n');
             const title = `[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`;
             const { data } = await github.rest.issues.create({
@@ -143,7 +143,7 @@ MD
             });
             core.setOutput('number', data.number);
 
-      - name: "SLA: etiquetas y fechas (horas habiles CDMX)"
+      - name: "SLA: labels and deadlines (biz hours CDMX)"
         id: sla
         uses: actions/github-script@v7
         env:
@@ -193,7 +193,7 @@ MD
               body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
             });
 
-      - name: "Preparar prompt para AI"
+      - name: "Prepare prompt for AI"
         id: prep
         shell: bash
         run: |
@@ -205,7 +205,7 @@ MD
             echo; echo "### SLA"; echo "- L-V 09:00-18:00 (CDMX). P1: resp<=3h/reso<=5h; P2: <=6h/<=8h; P3: <=9h/<=27h"
           } > prompt.md
 
-      - name: "Analisis con GitHub Models (AI)"
+      - name: "AI analysis (GitHub Models)"
         id: ai
         uses: actions/ai-inference@v1
         with:
@@ -222,7 +222,7 @@ MD
             No inventes datos; si falta informacion, pide una checklist corta.
           input-file: prompt.md
 
-      - name: "Comentar analisis AI en el Issue"
+      - name: "Post AI comment in Issue"
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
@@ -238,7 +238,7 @@ MD
               body
             });
 
-      - name: "Extraer bloque JSON (para checklist publica)"
+      - name: "Extract JSON for public checklist"
         id: parse_ai
         shell: bash
         run: |
@@ -247,7 +247,7 @@ MD
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
-      - name: "JSM comentario interno (analisis completo)"
+      - name: "JSM internal comment (full analysis)"
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
@@ -264,7 +264,7 @@ MD
             --data "$BODY" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
 
-      - name: "JSM comentario publico (solo checklist, si aplica)"
+      - name: "JSM public comment (checklist only, if any)"
         if: ${{ steps.parse_ai.outputs.json != '' }}
         shell: bash
         env:
