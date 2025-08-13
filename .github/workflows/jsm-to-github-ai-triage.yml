@@ -1,4 +1,4 @@
-name: "JSM SD to GitHub Issue + AI Triage (agent-ready, net-aware, read-only)"
+name: "JSM SD → GitHub Issue + AI Triage (agent-ready, net-aware, read-only)"
 
 on:
   repository_dispatch:
@@ -35,14 +35,14 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: "Debug payload"
+      - name: "Payload debug"
         uses: actions/github-script@v7
         with:
           script: |
             core.info(`event: ${context.eventName}`);
             core.info(JSON.stringify(context.payload, null, 2));
 
-      - name: "Read JSM ticket (SD-xxxx)"
+      - name: "Read JSM ticket"
         id: jsm
         shell: bash
         env:
@@ -74,19 +74,16 @@ jobs:
             echo "type=$(jq -r '.fields.issuetype.name' issue.json)"
           } >> "$GITHUB_OUTPUT"
 
-          # HTML renderizado y adjuntos
           jq -r '.renderedFields.description // ""' issue.json > description.html
           jq -r '.fields.attachment // [] | .[] | [.filename,.content,.mimeType] | @tsv' issue.json > attachments.tsv || true
 
-      - name: "Fix description: absolute links and remove inline <img>"
+      - name: "Fix description (absolute links, no inline img)"
         run: |
           set -euo pipefail
-          # Absolutiza rutas relativas
           sed -E "s#(src|href)=\"\/#\\1=\"${JIRA_BASE_URL}/#g" description.html > description_abs.html
-          # Reemplaza <img ...> por enlaces para evitar 404 embebido
           perl -0777 -pe 's#<img[^>]+src="([^"]+)"[^>]*>#\[Imagen JSM\]\($1\)#gi' description_abs.html > description_fixed.html
 
-      - name: "Install tools (dnsutils, tesseract, jq already present)"
+      - name: "Install tools"
         run: |
           sudo apt-get update -y
           sudo apt-get install -y dnsutils tesseract-ocr
@@ -115,34 +112,21 @@ jobs:
           if [ ! -s ocr/ocr.txt ]; then echo "No OCR text" > ocr/ocr.txt; fi
           echo "ocr_file=ocr/ocr.txt" >> "$GITHUB_OUTPUT"
 
-      - name: "Detect site hostname (from secrets/context/repo/desc/OCR)"
+      - name: "Detect hostname"
         id: host
         shell: bash
         env:
-          SITE_URL: ${{ secrets.SITE_URL }}   # opcional: configura JOJUVO prod aquí
+          SITE_URL: ${{ secrets.SITE_URL }}
         run: |
           set -euo pipefail
           PICK=""
-          # 1) Secrets.SITE_URL
-          if [ -n "${SITE_URL:-}" ]; then PICK="$SITE_URL"; fi
-          # 2) ops/context.md (linea con http/https)
-          if [ -z "$PICK" ] && grep -Eo 'https?://[^ )"]+' -m1 ops/context.md >/dev/null 2>&1; then
-            PICK="$(grep -Eo 'https?://[^ )"]+' -m1 ops/context.md)"
-          fi
-          # 3) repo files (config tipicas)
-          if [ -z "$PICK" ]; then
-            PICK="$(grep -RhoE 'https?://[a-zA-Z0-9.-]+\.[a-z]{2,}[^" ]*' --include='*.{ts,tsx,js,jsx,json,md,astro,php,html}' -m1 || true)"
-          fi
-          # 4) description u OCR
-          if [ -z "$PICK" ]; then
-            PICK="$(grep -Eo 'https?://[^ )"]+' -m1 description_fixed.html || true)"
-          fi
-          if [ -z "$PICK" ]; then
-            PICK="$(grep -Eo 'https?://[^ ]+' -m1 ocr/ocr.txt || true)"
-          fi
-          # Fallback manual (solo host)
+          [ -n "${SITE_URL:-}" ] && PICK="$SITE_URL"
+          [ -z "$PICK" ] && PICK="$(grep -Eo 'https?://[^ )"]+' -m1 ops/context.md || true)"
+          [ -z "$PICK" ] && PICK="$(grep -RhoE 'https?://[a-zA-Z0-9.-]+\.[a-z]{2,}[^" ]*' --include='*.{ts,tsx,js,jsx,json,md,astro,php,html}' -m1 || true)"
+          [ -z "$PICK" ] && PICK="$(grep -Eo 'https?://[^ )"]+' -m1 description_fixed.html || true)"
+          [ -z "$PICK" ] && PICK="$(grep -Eo 'https?://[^ ]+' -m1 ocr/ocr.txt || true)"
           HOST="$(echo "$PICK" | sed -E 's#https?://##; s#/.*##; s/[^a-zA-Z0-9\.\-].*//')"
-          if [ -z "$HOST" ]; then HOST="jojuvo.com"; fi
+          [ -z "$HOST" ] && HOST="jojuvo.com"
           echo "host=$HOST" >> "$GITHUB_OUTPUT"
           echo "url_guess=$PICK" >> "$GITHUB_OUTPUT"
 
@@ -157,15 +141,12 @@ jobs:
           echo "## Network diagnostics for $HOST" >> netdiag.md
           echo "### DNS" >> netdiag.md
           { dig +short A "$HOST"; dig +short AAAA "$HOST"; } | sed 's/^/- /' >> netdiag.md || true
-
           echo -e "\n### TLS (dates, issuer, subject)" >> netdiag.md
           timeout 10 bash -lc 'echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null | openssl x509 -noout -dates -issuer -subject' \
             | sed 's/^/  /' >> netdiag.md || echo "  (TLS check failed)" >> netdiag.md
-
           echo -e "\n### HTTP HEAD timings" >> netdiag.md
           curl -I --silent --show-error --connect-timeout 8 --max-time 15 "https://$HOST/" -w "\ncode:%{http_code} ip:%{remote_ip} t_connect:%{time_connect}s t_ttfb:%{time_starttransfer}s\n" \
             -o >(tee headers.txt >/dev/null) >> netdiag.md || echo "Request failed (timeout/conn error)" >> netdiag.md
-
           if [ -f headers.txt ]; then
             echo -e "\n### Response headers (subset)" >> netdiag.md
             grep -E '^(server:|cf-|x-litespeed|x-cache|via:|date:|content-type:|strict-transport-security:)' -i headers.txt | sed 's/^/  /' >> netdiag.md || true
@@ -191,88 +172,7 @@ jobs:
             printf "%s\n" "No hay contexto adicional (ops/context.md ausente)." > ops_context.md
           fi
 
-      - name: "Create GitHub Issue"
-        id: gh_issue
-        uses: actions/github-script@v7
-        env:
-          ISSUE_KEY: ${{ steps.jsm.outputs.issue_key }}
-          SUMMARY:   ${{ steps.jsm.outputs.summary }}
-          PROJECT:   ${{ steps.jsm.outputs.project }}
-          TYPE:      ${{ steps.jsm.outputs.type }}
-          PRIORITY:  ${{ steps.jsm.outputs.priority }}
-          REPORTER:  ${{ steps.jsm.outputs.reporter }}
-        with:
-          script: |
-            const fs = require('fs');
-            const descHtml = fs.readFileSync('description_fixed.html','utf8');
-            const atts = fs.readFileSync('attachments.md','utf8');
-            const body = [
-              '### Origen: Jira Service Management (SD)',
-              `- **Ticket:** [${process.env.ISSUE_KEY}](${process.env.JIRA_BASE_URL}/browse/${process.env.ISSUE_KEY})`,
-              `- **Proyecto/Tipo:** ${process.env.PROJECT} / ${process.env.TYPE}`,
-              `- **Prioridad (JSM):** ${process.env.PRIORITY}`,
-              `- **Reportado por:** ${process.env.REPORTER}`,
-              '',
-              '### Descripcion (JSM renderizada)',
-              `<details><summary>Ver</summary>\n\n${descHtml}\n\n</details>`,
-              '',
-              '### Adjuntos',
-              atts,
-              '',
-              '> Generado automaticamente desde JSM (SD).'
-            ].join('\n');
-            const title = `[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`;
-            const { data } = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body,
-              labels: ['from-jsm','triage','agent-ready']
-            });
-            core.setOutput('number', data.number);
-
-      - name: "SLA: labels and deadlines (biz hours CDMX)"
-        uses: actions/github-script@v7
-        env:
-          PRIORITY: ${{ steps.jsm.outputs.priority }}
-          ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
-          TZ: America/Mexico_City
-        with:
-          script: |
-            function addBizHours(hours) {
-              const tz = process.env.TZ || 'America/Mexico_City';
-              const isBizDay = d => { const w = d.getDay(); return w >= 1 && w <= 5; };
-              const start = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-              const setHour = (d, h) => { d.setHours(h, 0, 0, 0); return d; };
-              let d = start;
-              if (d.getHours() < 9) d = setHour(d, 9);
-              if (d.getHours() >= 18) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
-              let remaining = hours;
-              while (remaining > 0) {
-                if (!isBizDay(d)) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); continue; }
-                const todayLeft = 18 - d.getHours();
-                const step = Math.min(remaining, todayLeft);
-                d.setHours(d.getHours() + step);
-                remaining -= step;
-                if (remaining > 0) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
-              }
-              return d;
-            }
-            const pri = (process.env.PRIORITY || '').toUpperCase();
-            const map = { 'P1': { resp: 3, res: 5 }, 'P2': { resp: 6, res: 8 }, 'P3': { resp: 9, res: 27 } };
-            const sev = pri.includes('CRIT') ? 'P1' : (pri.includes('ALTA') ? 'P2' : 'P3');
-            const deadlines = map[sev];
-            const respBy = addBizHours(deadlines.resp);
-            const resoBy = addBizHours(deadlines.res);
-            const fmt = d => new Intl.DateTimeFormat('es-MX', { timeZone: process.env.TZ, dateStyle: 'medium', timeStyle: 'short' }).format(d);
-            await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER), labels: [`sev:${sev}`] });
-            await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER),
-              body: `**SLA (horas habiles CDMX)**\n- Respuesta (${sev}): ${deadlines.resp}h -> **${fmt(respBy)}**\n- Resolucion (${sev}): ${deadlines.res}h -> **${fmt(resoBy)}**`
-            });
-
-      # ------- Repo context + net signals para el prompt -------
-      - name: "Build repo context (tree + keyword matches)"
+      - name: "Repo context (tree + keyword matches)"
         id: repocontext
         shell: bash
         env:
@@ -299,20 +199,20 @@ jobs:
             fi
           } >> repo_context.md
 
-      - name: "Prepare prompt for AI (now with OCR + NetDiag)"
+      - name: "Prepare prompt (with OCR + NetDiag)"
         id: prep
         shell: bash
         run: |
           set -euo pipefail
           {
             echo "### Descripcion (HTML)"; cat description_fixed.html
-            echo; echo "### OCR de imagenes (si hubo)"; cat ocr/ocr.txt
+            echo; echo "### OCR de imagenes"; cat ocr/ocr.txt
             echo; echo "### Network diagnostics"; cat netdiag.md
-            echo; echo "### Host detectado"; echo "${{ steps.host.outputs.host }}  (origen: ${{ steps.host.outputs.url_guess || 'heuristica' }})"
+            echo; echo "### Host detectado"; echo "${{ steps.host.outputs.host }} (origen: ${{ steps.host.outputs.url_guess || 'heuristica' }})"
             echo; echo "### Adjuntos"; cat attachments.md
             echo; echo "### Contexto operativo"; cat ops_context.md
             echo; echo "### Repo context"; cat repo_context.md
-            echo; echo "### SLA"; echo "- L-V 09:00-18:00 (CDMX). P1: resp<=3h/reso<=5h; P2: <=6h/<=8h; P3: <=9h/<=27h"
+            echo; echo "### SLA window"; echo "L-V 09:00-18:00 (CDMX)."
             echo; echo "### Labels permitidas"; echo "bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix"
           } > prompt.md
 
@@ -322,40 +222,25 @@ jobs:
         with:
           model: openai/gpt-4o-mini
           system-prompt: |
-            Actua como ingeniero de soporte senior. Usa señales de OCR (capturas), diagnosticos de red (DNS/TLS/HTTP) y contexto del repo/hosting.
-            Clasifica por CAPA y prioriza causas de red cuando haya timeouts, fallos de TLS o DNS.
+            Actua como ingeniero de soporte senior. Usa OCR, NetDiag y contexto del repo/hosting.
             Devuelve EXACTAMENTE en Markdown:
             ## Clasificacion por capa
             - Capa sospechosa: (Cliente/Red | DNS/CDN | WAF/Seguridad | Servidor/Hosting | Aplicacion/Codigo)
-            - Evidencia clave (bullet list, max 5)
+            - Evidencia clave (max 5 bullets)
             - Confianza (baja/media/alta)
             ## Posible causa
             ## Solucion potencial
             ## Requisitos adicionales para replicar
+            - Usuarios (no tecnicos)
+            - Equipo de TI
             ## Riesgos/Infra (WAF/VPN/Server)
             Al final agrega un bloque ```json``` con:
-            {"layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo","cause":"...","solution":"...","replication_requirements":["..."],"risk_notes":"...","labels":["bug","question"],"confidence":"baja|media|alta"}
-            Regla: Si OCR contiene mensajes como ERR_CONNECTION_TIMED_OUT/ERR_NAME_NOT_RESOLVED o el netdiag muestra timeout/TLS expirado/DNS vacio, favorece capas de Red/DNS/WAF/Hosting por encima de Aplicacion/Codigo.
+            {"layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo","cause":"...","solution":"...","replication_requirements_user":["..."],"replication_requirements_it":["..."],"risk_notes":"...","labels":["bug","question"],"confidence":"baja|media|alta"}
+            Reglas: si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag muestra DNS vacio/TLS vencido/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad sobre Aplicacion/Codigo.
           prompt-file: prompt.md
           max-tokens: 900
 
-      - name: "Post AI comment in Issue"
-        uses: actions/github-script@v7
-        env:
-          ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
-          AI_MD_FILE:   ${{ steps.ai.outputs.response-file }}
-        with:
-          script: |
-            const fs = require('fs');
-            const body = fs.readFileSync(process.env.AI_MD_FILE,'utf8');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(process.env.ISSUE_NUMBER),
-              body
-            });
-
-      - name: "Extract JSON for checklist and labels"
+      - name: "Extract AI JSON"
         id: parse_ai
         shell: bash
         run: |
@@ -364,24 +249,154 @@ jobs:
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
-      - name: "Apply AI labels (existing only)"
-        if: ${{ steps.parse_ai.outputs.json != '' }}
+      - name: "Build checklists from AI (user/nontech & IT)"
+        id: ck
+        shell: bash
+        run: |
+          set -euo pipefail
+          # base from AI arrays
+          jq -r '.replication_requirements_user // [] | .[] | "- [ ] " + .' ai.json > user_ck.md || echo > user_ck.md
+          jq -r '.replication_requirements_it   // [] | .[] | "- [ ] " + .' ai.json > it_ck.md   || echo > it_ck.md
+          # extra friendly checklist if Cliente/Red
+          LAYER="$(jq -r '.layer // ""' ai.json)"
+          if echo "$LAYER" | grep -qi "Cliente/Red"; then
+            cat >> user_ck.md <<'MD'
+- [ ] Probar sin VPN/Proxy y sin bloqueadores de anuncios
+- [ ] Probar desde red movil (datos) o otra red WiFi
+- [ ] Probar en modo incognito y otro navegador
+- [ ] Captura de pantalla COMPLETA (incluye barra de direcciones y hora del sistema)
+- [ ] Confirmar URL exacta y pasos previos al error
+MD
+          fi
+          # defaults if empty
+          [ -s user_ck.md ] || echo "- [ ] Screenshot de pantalla completa" > user_ck.md
+          [ -s it_ck.md   ] || echo "- [ ] Confirmar si hay mantenimiento/implantacion en servidor o WAF" > it_ck.md
+
+      - name: "Compute SLA (biz hours CDMX)"
+        id: sla
         uses: actions/github-script@v7
         env:
-          ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
-          AI_JSON: ${{ steps.parse_ai.outputs.json }}
+          PRIORITY: ${{ steps.jsm.outputs.priority }}
+          TZ: America/Mexico_City
         with:
           script: |
-            const payload = JSON.parse(process.env.AI_JSON || '{}');
-            const wanted = Array.isArray(payload.labels) ? payload.labels : [];
-            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({ owner: context.repo.owner, repo: context.repo.repo, per_page: 200 });
-            const existing = new Set(repoLabels.map(l => l.name.toLowerCase()));
-            const toApply = [...new Set(wanted.map(s => String(s).trim()))].filter(Boolean).filter(s => existing.has(s.toLowerCase()));
-            if (toApply.length) {
-              await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(process.env.ISSUE_NUMBER), labels: toApply });
+            function addBizHours(hours) {
+              const tz = process.env.TZ || 'America/Mexico_City';
+              const isBizDay = d => { const w = d.getDay(); return w >= 1 && w <= 5; };
+              const start = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+              const setHour = (d, h) => { d.setHours(h, 0, 0, 0); return d; };
+              let d = start;
+              if (d.getHours() < 9) d = setHour(d, 9);
+              if (d.getHours() >= 18) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
+              let remaining = hours;
+              while (remaining > 0) {
+                if (!isBizDay(d)) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); continue; }
+                const todayLeft = 18 - d.getHours();
+                const step = Math.min(remaining, todayLeft);
+                d.setHours(d.getHours() + step);
+                remaining -= step;
+                if (remaining > 0) { do { d.setDate(d.getDate() + 1); } while (!isBizDay(d)); d = setHour(d, 9); }
+              }
+              return d;
             }
+            const pri = (process.env.PRIORITY || '').toUpperCase();
+            const map = { 'P1': { resp: 3, res: 5 }, 'P2': { resp: 6, res: 8 }, 'P3': { resp: 9, res: 27 } };
+            const sev = pri.includes('CRIT') ? 'P1' : (pri.includes('ALTA') ? 'P2' : 'P3');
+            const dl = map[sev];
+            const respBy = addBizHours(dl.resp);
+            const resoBy = addBizHours(dl.res);
+            const fmt = d => new Intl.DateTimeFormat('es-MX', { timeZone: process.env.TZ, dateStyle: 'medium', timeStyle: 'short' }).format(d);
+            core.setOutput('sev', `sev:${sev}`);
+            core.setOutput('resp', fmt(respBy));
+            core.setOutput('reso', fmt(resoBy));
 
-      - name: "JSM internal comment (full analysis)"
+      - name: "Create Issue with JSM + AI + Checklists + SLA"
+        id: create_issue
+        uses: actions/github-script@v7
+        env:
+          ISSUE_KEY:    ${{ steps.jsm.outputs.issue_key }}
+          SUMMARY:      ${{ steps.jsm.outputs.summary }}
+          PROJECT:      ${{ steps.jsm.outputs.project }}
+          TYPE:         ${{ steps.jsm.outputs.type }}
+          PRIORITY:     ${{ steps.jsm.outputs.priority }}
+          REPORTER:     ${{ steps.jsm.outputs.reporter }}
+          SEV_LABEL:    ${{ steps.sla.outputs.sev }}
+          RESP_DEADLINE:${{ steps.sla.outputs.resp }}
+          RESO_DEADLINE:${{ steps.sla.outputs.reso }}
+          AI_JSON:      ${{ steps.parse_ai.outputs.json }}
+        with:
+          script: |
+            const fs = require('fs');
+            const descHtml = fs.readFileSync('description_fixed.html','utf8');
+            const atts = fs.readFileSync('attachments.md','utf8');
+            const aiMd = fs.readFileSync(process.env.GITHUB_WORKSPACE + '/'+ process.env['GITHUB_ACTION_PATH'] ?? '', 'utf8'); // not used
+            const aiMdFile = process.env['GITHUB_STEP_SUMMARY']; // not used
+            const aiMdBody = fs.readFileSync(process.env['GITHUB_WORKSPACE'] + '/'+ 'prompt.md' , 'utf8'); // not used
+            const aiRendered = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/` + `${process.env['GITHUB_ACTION']?'':''}`, 'utf8'); // placeholder
+            const aiOut = fs.readFileSync(process.env.AI_RESPONSE_FILE || (process.env.AI_MD_FILE || ''), 'utf8', (e)=>''); // compat
+            const aiFile = process.env.AI_MD_FILE || `${process.env.GITHUB_WORKSPACE}/_ai.md`;
+            let aiMdText = '';
+            try { aiMdText = fs.readFileSync(process.env.AI_MD_FILE,'utf8'); } catch(e) { aiMdText = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/_temp_ai_response.md`,'utf8', (e)=>''); }
+            if (!aiMdText) { aiMdText = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/../_actions_output/response.md`,'utf8', (e)=>''); }
+            // fallback: read from action output path
+            try { aiMdText = fs.readFileSync(process.env['ACTIONS_AI_INFERENCE_RESPONSE_FILE'] || '', 'utf8'); } catch(e) {}
+
+            // Read checklists
+            const userCk = fs.readFileSync('user_ck.md','utf8');
+            const itCk   = fs.readFileSync('it_ck.md','utf8');
+
+            // Compose Issue body
+            const head = [
+              '### Origen: Jira Service Management (SD)',
+              `- **Ticket:** [${process.env.ISSUE_KEY}](${process.env.JIRA_BASE_URL}/browse/${process.env.ISSUE_KEY})`,
+              `- **Proyecto/Tipo:** ${process.env.PROJECT} / ${process.env.TYPE}`,
+              `- **Prioridad (JSM):** ${process.env.PRIORITY}`,
+              `- **Reportado por:** ${process.env.REPORTER}`,
+              '',
+              '### Descripcion (JSM renderizada)',
+              `<details><summary>Ver</summary>\n\n${descHtml}\n\n</details>`,
+              '',
+              '### Adjuntos',
+              atts,
+              '',
+              '---',
+              '## Analisis de IA',
+            ].join('\n');
+
+            const aiMd = fs.readFileSync(process.env.AI_MD_FILE,'utf8');
+            const aiJson = JSON.parse(process.env.AI_JSON || '{}');
+
+            const reqs = [
+              '## Requisitos adicionales para replicar',
+              '### Para usuarios (no tecnicos)',
+              userCk,
+              '',
+              '### Para equipo de TI',
+              itCk,
+              '',
+              '---',
+              '## SLA (horas habiles CDMX)',
+              `- Respuesta: **${process.env.RESP_DEADLINE}**`,
+              `- Resolucion: **${process.env.RESO_DEADLINE}**`
+            ].join('\n');
+
+            // Labels: from-jsm, triage, agent-ready, sev:P?, + AI labels que existan
+            const wanted = Array.isArray(aiJson.labels) ? aiJson.labels : [];
+            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({ owner: context.repo.owner, repo: context.repo.repo, per_page: 200 });
+            const exist = new Set(repoLabels.map(l => l.name.toLowerCase()));
+            const toApply = [...new Set(wanted.map(s => String(s).trim()))].filter(Boolean).filter(s => exist.has(s.toLowerCase()));
+
+            const create = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`,
+              body: [head, aiMd, reqs].join('\n\n'),
+              labels: ['from-jsm','triage','agent-ready', process.env.SEV_LABEL, ...toApply]
+            });
+            core.setOutput('number', create.data.number);
+            core.setOutput('layer', aiJson.layer || '');
+
+      - name: "JSM internal comment (full AI)"
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
@@ -392,39 +407,29 @@ jobs:
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
           MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "${{ steps.ai.outputs.response-file }}")"
           BODY="$(jq -n --arg md "$MD" '{body:$md, public:false}')"
-          curl -fsS -X POST \
-            -H "Authorization: Basic $AUTH" \
-            -H "Content-Type: application/json" \
-            --data "$BODY" \
+          curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" --data "$BODY" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
 
-      - name: "JSM public comment (checklist only, if any)"
-        if: ${{ steps.parse_ai.outputs.json != '' }}
+      - name: "JSM public comment (user checklist if Cliente/Red)"
         shell: bash
         env:
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           ISSUE_KEY:      ${{ steps.jsm.outputs.issue_key }}
+          LAYER:          ${{ steps.create_issue.outputs.layer }}
         run: |
           set -euo pipefail
-          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
-          reqs="$(jq -r '.replication_requirements // [] | map("- " + .) | join("\n")' ai.json)"
-          if [ -n "$reqs" ]; then
-            msg="Para avanzar mas rapido, por favor ayudanos con:\n${reqs}"
-            BODY="$(jq -n --arg md "$msg" '{body:$md, public:true}')"
-            curl -fsS -X POST \
-              -H "Authorization: Basic $AUTH" \
-              -H "Content-Type: application/json" \
-              --data "$BODY" \
+          if echo "${LAYER:-}" | grep -qi "Cliente/Red"; then
+            AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+            BODY="$(jq -n --arg md "$(cat user_ck.md)" '{body:$md, public:true}')"
+            curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" --data "$BODY" \
               "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
           fi
 
-      - name: "Agent-Ready brief (unchanged)"
+      - name: "Agent-Ready brief"
         uses: actions/github-script@v7
         env:
-          ISSUE_NUMBER: ${{ steps.gh_issue.outputs.number }}
-          SUMMARY:      ${{ steps.jsm.outputs.summary }}
-          ISSUE_KEY:    ${{ steps.jsm.outputs.issue_key }}
+          ISSUE_NUMBER: ${{ steps.create_issue.outputs.number }}
         with:
           script: |
             const fs = require('fs');
@@ -432,20 +437,11 @@ jobs:
             const body = [
               '> ### Agent-Ready Brief',
               '',
-              '**Objective**',
-              `- Address JSM ticket ${process.env.ISSUE_KEY}: ${process.env.SUMMARY}`,
-              '',
               '**Constraints**',
               '- Do not push to default branch. Open a PR with a clear plan.',
-              '- Keep changes minimal and scoped. Explain trade-offs.',
-              '- No external network calls except package registries allowed by repo policy.',
-              '- Respect Hostinger/LSWS, WAF/CDN rules and caching notes in ops/context.md.',
-              '',
-              '**Acceptance Criteria**',
-              '- Reproduce or explain why not reproducible.',
-              '- Implement fix/content change + sanity checks.',
-              '- No regressions; build passes.',
-              '- Include rollback notes and risk assessment.',
+              '- Keep changes minimal and scoped.',
+              '- No external network calls except allowed registries.',
+              '- Respect Hostinger/LSWS, ModSecurity/WAF and caching rules (ops/context.md).',
               '',
               '**Repo context (summary)**',
               '<details><summary>Open</summary>',
