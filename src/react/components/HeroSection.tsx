@@ -120,7 +120,7 @@ export function HeroSection() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Comprar entradas
+              Vender Salidas
             </motion.button>
           </motion.div>
         </motion.div>
