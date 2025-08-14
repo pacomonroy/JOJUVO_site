@@ -1,4 +1,4 @@
-name: "JSM → GitHub Issue + AI Triage (requisitos + recomendaciones + SLA JSM)"
+name: "JSM → GitHub Issue + AI Triage (limpio + SLA JSM)"
 
 on:
   repository_dispatch:
@@ -202,27 +202,22 @@ jobs:
           printf "\n%s\n" "### Labels permitidas" >> prompt.md
           echo "bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix" >> prompt.md
 
-      - name: AI analysis (layered triage w/ requisitos + recomendaciones)
+      - name: AI analysis (ONLY core sections in Markdown; requirements/recs in JSON)
         id: ai
         uses: actions/ai-inference@v1
         with:
           model: openai/gpt-4o-mini
           system-prompt: |
             Ingeniero de soporte senior. Usa el contexto (descripcion JSM, OCR, NetDiag, repo).
-            Devuelve EXACTAMENTE en Markdown:
+            EN EL MARKDOWN SOLO DEVUELVE ESTAS SECCIONES:
             ## Clasificacion por capa
             - Capa sospechosa: (Cliente/Red | DNS/CDN | WAF/Seguridad | Servidor/Hosting | Aplicacion/Codigo)
             - Evidencia clave (max 5 bullets)
             - Confianza (baja/media/alta)
             ## Posible causa
             ## Solucion potencial
-            ## Requisitos adicionales para replicar
-            - Usuarios (no tecnicos): (detalles/datos/recursos que debemos pedir al usuario para poder replicar)
-            - Equipo de TI: (detalles/datos/recursos que debemos pedir a TI/Infra para poder replicar)
-            ## Recomendaciones
-            - Usuarios (no tecnicos): (checklist para intentar resolver por su cuenta, si aplica)
-            - Equipo de TI: (checklist para que TI pruebe acciones de mitigacion/solucion, si aplica)
             ## Riesgos/Infra (WAF/VPN/Server)
+            NO INCLUYAS secciones de "Requisitos..." ni "Recomendaciones" en el Markdown.
 
             Al final agrega un bloque ```json``` con:
             {
@@ -239,8 +234,8 @@ jobs:
             }
 
             Reglas:
-            - Si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag evidencia DNS/TLS/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad sobre Aplicacion/Codigo.
-            - No inventes datos; si falta informacion, pide lo minimo necesario para replicar de forma accionable.
+            - Si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag evidencia DNS/TLS/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad.
+            - No inventes datos; si falta informacion, pide lo minimo necesario para replicar (en los arreglos del JSON).
           prompt-file: prompt.md
           max-tokens: 1000
 
@@ -252,6 +247,22 @@ jobs:
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
+      - name: Sanitize AI Markdown (remove JSON + any accidental Requisitos/Recomendaciones)
+        id: sanitize_ai
+        run: |
+          set -euo pipefail
+          awk '
+            /^```json$/ {injson=1; next}
+            injson && /^```/ {injson=0; next}
+            injson {next}
+            /^## Requisitos/ {skip=1; next}
+            /^## Recomendaciones/ {skip=1; next}
+            skip && /^## / {skip=0}
+            skip {next}
+            {print}
+          ' "${{ steps.ai.outputs.response-file }}" > ai_core.md
+          echo "ai_core=ai_core.md" >> "$GITHUB_OUTPUT"
+
       - name: Build checklists (Requisitos y Recomendaciones)
         id: ck
         run: |
@@ -262,17 +273,13 @@ jobs:
           # Recomendaciones (checklists para probar soluciones)
           jq -r '.recommendations_user // [] | .[] | "- [ ] " + .' ai.json > user_rec_ck.md || true
           jq -r '.recommendations_it   // [] | .[] | "- [ ] " + .' ai.json > it_rec_ck.md   || true
-
-          # Fallbacks minimos
+          # Fallbacks
           [ -s user_req_ck.md ] || printf "%s\n" "- [ ] Screenshot de pantalla completa (incluye barra de direcciones y hora)" > user_req_ck.md
           [ -s it_req_ck.md   ] || printf "%s\n" "- [ ] Confirmar si hay mantenimiento/cambios en servidor, WAF o DNS" > it_req_ck.md
           [ -s user_rec_ck.md ] || printf "%s\n" "- [ ] Probar modo incógnito, otro navegador y sin VPN/Proxy" > user_rec_ck.md
           [ -s it_rec_ck.md   ] || printf "%s\n" "- [ ] Revisar logs del servidor y WAF/ModSecurity; validar TLS/DNS" > it_rec_ck.md
 
-          LAYER="$(jq -r '.layer // ""' ai.json)"
-          echo "layer=$LAYER" >> "$GITHUB_OUTPUT"
-
-      - name: Fetch SLA from JSM (official API) and summarize
+      - name: Fetch SLA from JSM (official API)
         id: sla
         env:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
@@ -283,9 +290,8 @@ jobs:
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
           curl -fsS -H "Authorization: Basic $AUTH" -H "Accept: application/json" \
             "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/sla" > sla.json
-          # Resumen legible: por cada SLA, usa ongoingCycle si existe; si no, el ultimo completedCycle
           : > sla.md
-          echo "### SLA (JSM)" >> sla.md
+          echo "## SLA (JSM)" >> sla.md
           jq -r '
             .values[] as $v
             | $v.name as $name
@@ -304,14 +310,16 @@ jobs:
                           ($c.breached // false)
                         ] | @tsv )
                   end )' sla.json \
-            | while IFS=$'\t' read -r NAME GOAL REMAIN BREACHED; do
-                printf -- "- **%s** → Objetivo: %s · Restante/Estado: %s · Breach: %s\n" "$NAME" "$GOAL" "$REMAIN" "$BREACHED" >> sla.md
-              done
-          if ! grep -q ' - ' sla.md 2>/dev/null; then
+          | while IFS=$'\t' read -r NAME GOAL REMAIN BREACHED; do
+              [ -n "$NAME" ] || continue
+              printf -- "- **%s** → Objetivo: %s · Restante/Estado: %s · Breach: %s\n" "$NAME" "$GOAL" "$REMAIN" "$BREACHED" >> sla.md
+            done
+          # Si no se imprimió ninguna línea con "- " (bullets), agrega fallback
+          if ! grep -q '^- ' sla.md; then
             echo "_No hay métricas de SLA disponibles para este ticket (o falta permiso de agente)_" >> sla.md
           fi
 
-      - name: Create Issue (JSM + IA + Requisitos + Recomendaciones + SLA JSM)
+      - name: Create Issue (IA limpia + Requisitos + Recomendaciones + SLA)
         id: create_issue
         uses: actions/github-script@v7
         env:
@@ -321,20 +329,18 @@ jobs:
           TYPE:          ${{ steps.jsm.outputs.type }}
           PRIORITY:      ${{ steps.jsm.outputs.priority }}
           REPORTER:      ${{ steps.jsm.outputs.reporter }}
-          AI_JSON:       ${{ steps.parse_ai.outputs.json }}
-          AI_MD_FILE:    ${{ steps.ai.outputs.response-file }}
+          AI_MD_CORE:    ${{ steps.sanitize_ai.outputs.ai_core }}
         with:
           script: |
             const fs=require('fs');
             const desc=fs.readFileSync('description_fixed.html','utf8');
             const atts=fs.readFileSync('attachments.md','utf8');
-            const aiMd=fs.readFileSync(process.env.AI_MD_FILE,'utf8');
+            const aiMd=fs.readFileSync(process.env.AI_MD_CORE,'utf8'); // IA saneada (sin JSON ni secciones duplicadas)
             const userReq=fs.readFileSync('user_req_ck.md','utf8');
             const itReq=fs.readFileSync('it_req_ck.md','utf8');
             const userRec=fs.readFileSync('user_rec_ck.md','utf8');
             const itRec=fs.readFileSync('it_rec_ck.md','utf8');
             const sla=fs.readFileSync('sla.md','utf8');
-            const aiJson=JSON.parse(process.env.AI_JSON||'{}');
 
             const head=[
               '### Origen: Jira Service Management (SD)',
@@ -373,48 +379,15 @@ jobs:
 
             const body=[head, aiMd, reqs, recs, sla].join('\n\n');
 
-            // aplicar labels IA existentes
-            const wanted=Array.isArray(aiJson.labels)?aiJson.labels:[];
             const {data: repoLabels}=await github.rest.issues.listLabelsForRepo({
               owner:context.repo.owner, repo:context.repo.repo, per_page:200
             });
             const existing=new Set(repoLabels.map(l=>l.name.toLowerCase()));
-            const extra=[...new Set(wanted.map(s=>String(s).trim()))]
-              .filter(Boolean).filter(s=>existing.has(s.toLowerCase()));
-
+            const base=['from-jsm','triage','agent-ready'];
+            const labels=base.filter(l=>existing.has(l.toLowerCase())).length?base:[];
             const create=await github.rest.issues.create({
               owner:context.repo.owner, repo:context.repo.repo,
               title:`[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`,
-              body, labels:['from-jsm','triage','agent-ready',...extra]
+              body, labels
             });
             core.setOutput('number', create.data.number);
-            core.setOutput('layer', aiJson.layer || '');
-
-      - name: JSM internal comment (full AI)
-        env:
-          JIRA_EMAIL:  ${{ secrets.JIRA_EMAIL }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          ISSUE_KEY:   ${{ steps.key.outputs.issue_key }}
-          AI_MD_FILE:  ${{ steps.ai.outputs.response-file }}
-        run: |
-          set -euo pipefail
-          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
-          MD="$(sed 's/\\/\\\\/g; s/"/\\"/g' "$AI_MD_FILE")"
-          BODY="$(jq -n --arg md "$MD" '{body:$md, public:false}')"
-          curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" \
-            --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
-
-      - name: JSM public comment (si capa=Cliente/Red → recomendaciones usuario)
-        env:
-          JIRA_EMAIL:  ${{ secrets.JIRA_EMAIL }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          ISSUE_KEY:   ${{ steps.key.outputs.issue_key }}
-          LAYER:       ${{ steps.create_issue.outputs.layer }}
-        run: |
-          set -euo pipefail
-          if echo "${LAYER:-}" | grep -qi "Cliente/Red"; then
-            AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
-            BODY="$(jq -n --arg md "$(cat user_rec_ck.md)" '{body:$md, public:true}')"
-            curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" \
-              --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
-          fi
