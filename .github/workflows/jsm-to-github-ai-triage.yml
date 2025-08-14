@@ -1,4 +1,4 @@
-name: "JSM → GitHub Issue + AI Triage (multi-proyecto, seguro, read-only)"
+name: "JSM → GitHub Issue + AI Triage (requisitos + recomendaciones + SLA JSM)"
 
 on:
   repository_dispatch:
@@ -55,6 +55,8 @@ jobs:
           ISSUE_KEY: ${{ steps.key.outputs.issue_key }}
         run: |
           set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y jq
           AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
           curl -fsS -H "Authorization: Basic $AUTH" -H "Accept: application/json" \
             "$JIRA_BASE_URL/rest/api/3/issue/$ISSUE_KEY?expand=renderedFields&fields=summary,description,priority,reporter,attachment,issuetype,project" \
@@ -79,7 +81,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y dnsutils tesseract-ocr
+          sudo apt-get install -y dnsutils tesseract-ocr jq
 
       - name: Download image attachments + OCR
         id: ocr
@@ -110,46 +112,6 @@ jobs:
           [ -s ocr/ocr.txt ] || echo "No OCR text" > ocr/ocr.txt
           echo "ocr_file=ocr/ocr.txt" >> "$GITHUB_OUTPUT"
 
-      - name: Load project profile (from repo variable if set)
-        id: profile
-        run: |
-          set -euo pipefail
-          if [ -n "${{ vars.PROFILE_JSON }}" ]; then
-            printf '%s' '${{ vars.PROFILE_JSON }}' > profile.json
-          else
-            echo '{}' > profile.json
-          fi
-
-      - name: Detect repo signals (stack/auth/db/integrations/perms)
-        id: detect
-        run: |
-          set -euo pipefail
-          : > detect.json
-          node -e '
-            const fs=require("fs");
-            const has=f=>fs.existsSync(f);
-            const pkg=has("package.json")?JSON.parse(fs.readFileSync("package.json","utf8")):{};
-            const deps={...(pkg.dependencies||{}),...(pkg.devDependencies||{})};
-            const stack=[];
-            if (has("manage.py")||/django/i.test(JSON.stringify(deps))) stack.push("django");
-            if (/astro/i.test(JSON.stringify(deps))) stack.push("astro");
-            if (/react/i.test(JSON.stringify(deps))) stack.push("react");
-            if (/strapi/i.test(JSON.stringify(deps))) stack.push("strapi");
-            const auth=[];
-            if (/msal|azure|entra/i.test(JSON.stringify(deps))) auth.push("azure-entra");
-            if (/google-auth|passport-google|@react-oauth\/google/i.test(JSON.stringify(deps))) auth.push("google");
-            const db=[];
-            if (/postgres|psycopg/i.test(JSON.stringify(deps))) db.push("postgresql");
-            if (/mongodb|mongoose/i.test(JSON.stringify(deps))) db.push("mongo");
-            if (/mssql|sqlserver|tedious/i.test(JSON.stringify(deps))) db.push("mssql");
-            const integ=[];
-            if (/@googlemaps|leaflet|mapbox|google\.maps/i.test(JSON.stringify(deps))) integ.push("maps");
-            const perms=[];
-            if (/geolocation|getUserMedia|Notification\.requestPermission/i.test(JSON.stringify(deps))) perms.push("geolocation/camera/mic/notifications");
-            const out={stack,auth,db,integrations:integ,permissions:perms};
-            fs.writeFileSync("detect.json",JSON.stringify(out));
-          '
-
       - name: Detect hostname (vars/desc/OCR/repo)
         id: host
         env:
@@ -166,17 +128,11 @@ jobs:
           echo "host=$host" >> "$GITHUB_OUTPUT"
           echo "url_guess=$pick" >> "$GITHUB_OUTPUT"
 
-      - name: Network diagnostics (DNS/TLS/HTTP) respecting privacy
+      - name: Network diagnostics (DNS/TLS/HTTP) - safe
         id: net
         run: |
           set -euo pipefail
           HOST="${{ steps.host.outputs.host }}"
-          MODE="$(jq -r '.privacy.mode // empty' profile.json || true)"
-          PROBES="$(jq -r '.net_probes // "auto"' profile.json || echo auto)"
-          if [ "$PROBES" = "skip" ] || [ "$MODE" = "private" ]; then
-            echo "Skipping probes due to privacy/profile." > netdiag.md
-            exit 0
-          fi
           : > netdiag.md
           echo "## Network diagnostics for $HOST" >> netdiag.md
           echo "### DNS" >> netdiag.md
@@ -231,7 +187,7 @@ jobs:
             echo "\`\`\`" >> repo_context.md
           fi
 
-      - name: Prepare prompt (OCR + NetDiag + profile + detect + repo)
+      - name: Prepare prompt (OCR + NetDiag + repo)
         id: prep
         run: |
           set -euo pipefail
@@ -241,26 +197,18 @@ jobs:
           cat ocr/ocr.txt >> prompt.md
           printf "\n%s\n" "### Network diagnostics" >> prompt.md
           cat netdiag.md >> prompt.md 2>/dev/null || true
-          printf "\n%s\n" "### Host detectado" >> prompt.md
-          echo "${{ steps.host.outputs.host }} (origen: ${{ steps.host.outputs.url_guess || 'heuristica' }})" >> prompt.md
-          printf "\n%s\n" "### Project profile (JSON)" >> prompt.md
-          cat profile.json >> prompt.md
-          printf "\n%s\n" "### Repo auto-detect" >> prompt.md
-          cat detect.json >> prompt.md
           printf "\n%s\n" "### Repo context" >> prompt.md
           cat repo_context.md >> prompt.md
-          printf "\n%s\n" "### SLA window" >> prompt.md
-          echo "L-V 09:00-18:00 (CDMX)" >> prompt.md
           printf "\n%s\n" "### Labels permitidas" >> prompt.md
           echo "bug, documentation, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix" >> prompt.md
 
-      - name: AI analysis (layered triage)
+      - name: AI analysis (layered triage w/ requisitos + recomendaciones)
         id: ai
         uses: actions/ai-inference@v1
         with:
           model: openai/gpt-4o-mini
           system-prompt: |
-            Ingeniero de soporte senior. Usa OCR, NetDiag, perfil del proyecto (stack/privacidad/auth/deploy/DB/integraciones/permisos), auto-detecciones y repo.
+            Ingeniero de soporte senior. Usa el contexto (descripcion JSM, OCR, NetDiag, repo).
             Devuelve EXACTAMENTE en Markdown:
             ## Clasificacion por capa
             - Capa sospechosa: (Cliente/Red | DNS/CDN | WAF/Seguridad | Servidor/Hosting | Aplicacion/Codigo)
@@ -269,14 +217,32 @@ jobs:
             ## Posible causa
             ## Solucion potencial
             ## Requisitos adicionales para replicar
-            - Usuarios (no tecnicos)
-            - Equipo de TI
+            - Usuarios (no tecnicos): (detalles/datos/recursos que debemos pedir al usuario para poder replicar)
+            - Equipo de TI: (detalles/datos/recursos que debemos pedir a TI/Infra para poder replicar)
+            ## Recomendaciones
+            - Usuarios (no tecnicos): (checklist para intentar resolver por su cuenta, si aplica)
+            - Equipo de TI: (checklist para que TI pruebe acciones de mitigacion/solucion, si aplica)
             ## Riesgos/Infra (WAF/VPN/Server)
+
             Al final agrega un bloque ```json``` con:
-            {"layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo","cause":"...","solution":"...","replication_requirements_user":["..."],"replication_requirements_it":["..."],"risk_notes":"...","labels":["bug","question"],"confidence":"baja|media|alta"}
-            Reglas: si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag evidencia DNS/TLS/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad sobre Aplicacion/Codigo.
+            {
+              "layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo",
+              "cause":"...",
+              "solution":"...",
+              "replication_requirements_user":["..."],
+              "replication_requirements_it":["..."],
+              "recommendations_user":["..."],
+              "recommendations_it":["..."],
+              "risk_notes":"...",
+              "labels":["bug","question"],
+              "confidence":"baja|media|alta"
+            }
+
+            Reglas:
+            - Si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag evidencia DNS/TLS/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad sobre Aplicacion/Codigo.
+            - No inventes datos; si falta informacion, pide lo minimo necesario para replicar de forma accionable.
           prompt-file: prompt.md
-          max-tokens: 900
+          max-tokens: 1000
 
       - name: Parse AI JSON
         id: parse_ai
@@ -286,56 +252,66 @@ jobs:
           jq -e . ai.json >/dev/null 2>&1 || echo '{}' > ai.json
           echo "json=$(cat ai.json | jq -c .)" >> "$GITHUB_OUTPUT"
 
-      - name: Build checklists (Usuarios / TI)
+      - name: Build checklists (Requisitos y Recomendaciones)
         id: ck
         run: |
           set -euo pipefail
-          jq -r '.replication_requirements_user // [] | .[] | "- [ ] " + .' ai.json > user_ck.md || true
-          jq -r '.replication_requirements_it   // [] | .[] | "- [ ] " + .' ai.json > it_ck.md   || true
+          # Requisitos (lo que debemos pedir para replicar)
+          jq -r '.replication_requirements_user // [] | .[] | "- [ ] " + .' ai.json > user_req_ck.md || true
+          jq -r '.replication_requirements_it   // [] | .[] | "- [ ] " + .' ai.json > it_req_ck.md   || true
+          # Recomendaciones (checklists para probar soluciones)
+          jq -r '.recommendations_user // [] | .[] | "- [ ] " + .' ai.json > user_rec_ck.md || true
+          jq -r '.recommendations_it   // [] | .[] | "- [ ] " + .' ai.json > it_rec_ck.md   || true
+
+          # Fallbacks minimos
+          [ -s user_req_ck.md ] || printf "%s\n" "- [ ] Screenshot de pantalla completa (incluye barra de direcciones y hora)" > user_req_ck.md
+          [ -s it_req_ck.md   ] || printf "%s\n" "- [ ] Confirmar si hay mantenimiento/cambios en servidor, WAF o DNS" > it_req_ck.md
+          [ -s user_rec_ck.md ] || printf "%s\n" "- [ ] Probar modo incógnito, otro navegador y sin VPN/Proxy" > user_rec_ck.md
+          [ -s it_rec_ck.md   ] || printf "%s\n" "- [ ] Revisar logs del servidor y WAF/ModSecurity; validar TLS/DNS" > it_rec_ck.md
+
           LAYER="$(jq -r '.layer // ""' ai.json)"
-          if echo "$LAYER" | grep -qi "Cliente/Red"; then
-            printf "%s\n" "- [ ] Probar sin VPN/Proxy y sin bloqueadores de anuncios" >> user_ck.md
-            printf "%s\n" "- [ ] Probar desde red movil (datos) u otra WiFi" >> user_ck.md
-            printf "%s\n" "- [ ] Modo incógnito y otro navegador" >> user_ck.md
-            printf "%s\n" "- [ ] Captura de pantalla COMPLETA (con barra de direcciones y hora)" >> user_ck.md
-            printf "%s\n" "- [ ] Confirmar URL exacta y pasos previos al error" >> user_ck.md
-          fi
-          [ -s user_ck.md ] || printf "%s\n" "- [ ] Screenshot de pantalla completa" > user_ck.md
-          [ -s it_ck.md   ] || printf "%s\n" "- [ ] Confirmar mantenimiento/cambios en servidor o WAF" > it_ck.md
           echo "layer=$LAYER" >> "$GITHUB_OUTPUT"
 
-      - name: Compute SLA (biz hours CDMX)
+      - name: Fetch SLA from JSM (official API) and summarize
         id: sla
-        uses: actions/github-script@v7
         env:
-          PRIORITY: ${{ steps.jsm.outputs.priority }}
-          TZ: America/Mexico_City
-        with:
-          script: |
-            function biz(hours){
-              const tz=process.env.TZ||'America/Mexico_City';
-              const ok=d=>{const w=d.getDay();return w>=1&&w<=5;}
-              let d=new Date(new Date().toLocaleString('en-US',{timeZone:tz}));
-              const setH=(x,h)=>{x.setHours(h,0,0,0);return x;}
-              if(d.getHours()<9)d=setH(d,9);
-              if(d.getHours()>=18){do{d.setDate(d.getDate()+1)}while(!ok(d));d=setH(d,9)}
-              let r=hours;
-              while(r>0){ if(!ok(d)){do{d.setDate(d.getDate()+1)}while(!ok(d));d=setH(d,9);continue}
-                const left=18-d.getHours(); const step=Math.min(r,left);
-                d.setHours(d.getHours()+step); r-=step;
-                if(r>0){do{d.setDate(d.getDate()+1)}while(!ok(d)); d=setH(d,9)}
-              }
-              return d;
-            }
-            const pri=(process.env.PRIORITY||'').toUpperCase();
-            const map={P1:{resp:3,res:5},P2:{resp:6,res:8},P3:{resp:9,res:27}};
-            const sev=pri.includes('CRIT')?'P1':(pri.includes('ALTA')?'P2':'P3');
-            const fmt=d2=>new Intl.DateTimeFormat('es-MX',{timeZone:process.env.TZ,dateStyle:'medium',timeStyle:'short'}).format(d2);
-            core.setOutput('sev',`sev:${sev}`);
-            core.setOutput('resp',fmt(biz(map[sev].resp)));
-            core.setOutput('reso',fmt(biz(map[sev].res)));
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          ISSUE_KEY: ${{ steps.key.outputs.issue_key }}
+        run: |
+          set -euo pipefail
+          AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
+          curl -fsS -H "Authorization: Basic $AUTH" -H "Accept: application/json" \
+            "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/sla" > sla.json
+          # Resumen legible: por cada SLA, usa ongoingCycle si existe; si no, el ultimo completedCycle
+          : > sla.md
+          echo "### SLA (JSM)" >> sla.md
+          jq -r '
+            .values[] as $v
+            | $v.name as $name
+            | ( ($v.ongoingCycle // empty) as $o
+                | if $o != null then
+                    [ $name,
+                      ($o.goalDuration.friendly // ($o.goalDuration.millis|tostring)+"ms"),
+                      ($o.remainingTime.friendly // "n/a"),
+                      ($o.breached // false)
+                    ] | @tsv
+                  else
+                    ( ($v.completedCycles | last) as $c
+                      | [ $name,
+                          ($c.goalDuration.friendly // ($c.goalDuration.millis|tostring)+"ms"),
+                          "completed",
+                          ($c.breached // false)
+                        ] | @tsv )
+                  end )' sla.json \
+            | while IFS=$'\t' read -r NAME GOAL REMAIN BREACHED; do
+                printf -- "- **%s** → Objetivo: %s · Restante/Estado: %s · Breach: %s\n" "$NAME" "$GOAL" "$REMAIN" "$BREACHED" >> sla.md
+              done
+          if ! grep -q ' - ' sla.md 2>/dev/null; then
+            echo "_No hay métricas de SLA disponibles para este ticket (o falta permiso de agente)_" >> sla.md
+          fi
 
-      - name: Create Issue (JSM + IA + Requisitos + SLA) & labels
+      - name: Create Issue (JSM + IA + Requisitos + Recomendaciones + SLA JSM)
         id: create_issue
         uses: actions/github-script@v7
         env:
@@ -345,9 +321,6 @@ jobs:
           TYPE:          ${{ steps.jsm.outputs.type }}
           PRIORITY:      ${{ steps.jsm.outputs.priority }}
           REPORTER:      ${{ steps.jsm.outputs.reporter }}
-          SEV_LABEL:     ${{ steps.sla.outputs.sev }}
-          RESP_DEADLINE: ${{ steps.sla.outputs.resp }}
-          RESO_DEADLINE: ${{ steps.sla.outputs.reso }}
           AI_JSON:       ${{ steps.parse_ai.outputs.json }}
           AI_MD_FILE:    ${{ steps.ai.outputs.response-file }}
         with:
@@ -356,8 +329,11 @@ jobs:
             const desc=fs.readFileSync('description_fixed.html','utf8');
             const atts=fs.readFileSync('attachments.md','utf8');
             const aiMd=fs.readFileSync(process.env.AI_MD_FILE,'utf8');
-            const userCk=fs.readFileSync('user_ck.md','utf8');
-            const itCk=fs.readFileSync('it_ck.md','utf8');
+            const userReq=fs.readFileSync('user_req_ck.md','utf8');
+            const itReq=fs.readFileSync('it_req_ck.md','utf8');
+            const userRec=fs.readFileSync('user_rec_ck.md','utf8');
+            const itRec=fs.readFileSync('it_rec_ck.md','utf8');
+            const sla=fs.readFileSync('sla.md','utf8');
             const aiJson=JSON.parse(process.env.AI_JSON||'{}');
 
             const head=[
@@ -379,19 +355,23 @@ jobs:
 
             const reqs=[
               '## Requisitos adicionales para replicar',
-              '### Para usuarios (no tecnicos)',
-              userCk,
+              '### Usuarios (no tecnicos)',
+              userReq,
               '',
-              '### Para equipo de TI',
-              itCk,
-              '',
-              '---',
-              '## SLA (horas habiles CDMX)',
-              `- Respuesta: **${process.env.RESP_DEADLINE}**`,
-              `- Resolucion: **${process.env.RESO_DEADLINE}**`
+              '### Equipo de TI',
+              itReq
             ].join('\n');
 
-            const body=[head, aiMd, reqs].join('\n\n');
+            const recs=[
+              '## Recomendaciones',
+              '### Usuarios (no tecnicos)',
+              userRec,
+              '',
+              '### Equipo de TI',
+              itRec
+            ].join('\n');
+
+            const body=[head, aiMd, reqs, recs, sla].join('\n\n');
 
             // aplicar labels IA existentes
             const wanted=Array.isArray(aiJson.labels)?aiJson.labels:[];
@@ -405,7 +385,7 @@ jobs:
             const create=await github.rest.issues.create({
               owner:context.repo.owner, repo:context.repo.repo,
               title:`[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`,
-              body, labels:['from-jsm','triage','agent-ready',process.env.SEV_LABEL,...extra]
+              body, labels:['from-jsm','triage','agent-ready',...extra]
             });
             core.setOutput('number', create.data.number);
             core.setOutput('layer', aiJson.layer || '');
@@ -424,7 +404,7 @@ jobs:
           curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" \
             --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null
 
-      - name: JSM public comment (user checklist if layer=Cliente/Red)
+      - name: JSM public comment (si capa=Cliente/Red → recomendaciones usuario)
         env:
           JIRA_EMAIL:  ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -434,7 +414,7 @@ jobs:
           set -euo pipefail
           if echo "${LAYER:-}" | grep -qi "Cliente/Red"; then
             AUTH="$(printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64 -w 0 2>/dev/null || printf "%s:%s" "$JIRA_EMAIL" "$JIRA_API_TOKEN" | base64)"
-            BODY="$(jq -n --arg md "$(cat user_ck.md)" '{body:$md, public:true}')"
+            BODY="$(jq -n --arg md "$(cat user_rec_ck.md)" '{body:$md, public:true}')"
             curl -fsS -X POST -H "Authorization: Basic $AUTH" -H "Content-Type: application/json" \
               --data "$BODY" "$JIRA_BASE_URL/rest/servicedeskapi/request/${ISSUE_KEY}/comment" >/dev/null || true
           fi
