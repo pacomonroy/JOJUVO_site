@@ -1,4 +1,4 @@
-name: "JSM → GitHub Issue + AI Triage (labels IA + TZ hints + SLA JSM + JSM comment fix)"
+name: "JSM → GitHub Issue + AI Triage (SLA label + Copilot link + safe grep)"
 
 on:
   repository_dispatch:
@@ -160,7 +160,7 @@ jobs:
             printf "_Sin adjuntos_\n" > attachments.md
           fi
 
-      - name: Repo context (tree + matches + TZ signals)
+      - name: Repo context (tree + matches + TZ signals)  # <-- sin pipes que rompan
         id: repocontext
         env:
           SUMMARY: ${{ steps.jsm.outputs.summary }}
@@ -171,17 +171,25 @@ jobs:
           [ -n "$TOKENS" ] || TOKENS="."
           echo "### Repo tree (top 200)" > repo_context.md
           (git ls-files 2>/dev/null || find . -type f) | head -n 200 >> repo_context.md
+
           echo "" >> repo_context.md
           echo "### Keyword pattern" >> repo_context.md
           echo "$TOKENS" >> repo_context.md
           echo "" >> repo_context.md
           echo "### Matches (first 200 lines across source files)" >> repo_context.md
+          # Genera archivo y luego trunca, evitando pipe con head
+          : > _matches.txt
           find . -type d \( -name .git -o -name node_modules -o -name dist -o -name build \) -prune -o \
             -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.jsx" -o -name "*.php" -o -name "*.html" -o -name "*.astro" -o -name "*.css" -o -name "*.scss" -o -name "*.vue" -o -name "*.json" -o -name "*.md" \) \
-            -print0 | xargs -0 -I{} sh -c 'grep -n -i -E "$0" "{}" | head -n 2' "$TOKENS" | head -n 200 >> repo_context.md || true
-          # señales de TZ/fecha/únicos por día para ayudar a IA (no imprimimos instrucciones del caso)
-          { echo ""; echo "### TZ / daily-unique signals"; \
-            grep -RniE 'TIME_ZONE|USE_TZ|date_trunc|timezone\(|AT TIME ZONE|unique.*day|daily|per.?day' --include='*.py' --include='*.sql' --include='*.js' --include='*.ts' 2>/dev/null | head -n 80; } >> repo_context.md
+            -print0 | xargs -0 -I{} sh -c 'grep -n -i -E "$0" -m 2 "{}" 2>/dev/null || true' "$TOKENS" >> _matches.txt || true
+          sed -n '1,200p' _matches.txt >> repo_context.md || true
+
+          echo "" >> repo_context.md
+          echo "### TZ / daily-unique signals" >> repo_context.md
+          grep -RniE 'TIME_ZONE|USE_TZ|date_trunc|timezone\(|AT TIME ZONE|unique.*day|daily|per.?day' \
+            --include='*.py' --include='*.sql' --include='*.js' --include='*.ts' 2>/dev/null > _tz_hits.txt || true
+          sed -n '1,80p' _tz_hits.txt >> repo_context.md || true
+
           if [ -f package.json ]; then
             echo "" >> repo_context.md
             echo "### Project commands" >> repo_context.md
@@ -220,27 +228,12 @@ jobs:
             ## Posible causa
             ## Solucion potencial
             ## Riesgos/Infra (WAF/VPN/Server)
-
             NO incluyas "Requisitos..." ni "Recomendaciones" en Markdown.
-            Incluye al final un bloque ```json``` con:
-            {
-              "layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo",
-              "cause":"...",
-              "solution":"...",
-              "replication_requirements_user":["..."],
-              "replication_requirements_it":["..."],
-              "recommendations_user":["..."],
-              "recommendations_it":["..."],
-              "risk_notes":"...",
-              "labels":["bug","question"],
-              "confidence":"baja|media|alta"
-            }
-
-            Hints de dominio (no los imprimas, solo considéralos):
-            - Reglas de "N registros únicos por día": validar diferencias de zona horaria (Django TIME_ZONE/USE_TZ, JS Date, tz del servidor y DB).
-            - Posibles causas: cálculo del “día” con UTC vs local, truncado en DB (date_trunc/AT TIME ZONE), caches, relojes desincronizados, cookies/estado de usuario, tareas nocturnas.
-            - Un solo usuario afectado sugiere factores de cliente/sesión o datos de cuenta.
-
+            Al final, bloque ```json``` con:
+            {"layer":"Cliente/Red|DNS/CDN|WAF/Seguridad|Servidor/Hosting|Aplicacion/Codigo","cause":"...","solution":"...","replication_requirements_user":["..."],"replication_requirements_it":["..."],"recommendations_user":["..."],"recommendations_it":["..."],"risk_notes":"...","labels":["bug","question"],"confidence":"baja|media|alta"}
+            Hints (no imprimir):
+            - Reglas de registros únicos por día y zonas horarias: TIME_ZONE/USE_TZ de Django, Date en JS, tz de servidor/DB (date_trunc/AT TIME ZONE), caches/sesiones/cron.
+            - Un único usuario afectado puede apuntar a estado de cliente/cuenta, horario local, reloj, cookies.
             Reglas:
             - Si hay ERR_CONNECTION_TIMED_OUT/NAME_NOT_RESOLVED o NetDiag evidencia DNS/TLS/timeout, prioriza Cliente/Red, DNS/CDN o WAF/Seguridad.
             - No inventes datos; pide lo mínimo necesario en los arreglos del JSON.
@@ -315,15 +308,33 @@ jobs:
                           ($c.breached // false)
                         ] | @tsv )
                   end )' sla.json \
-          | while IFS=$'\t' read -r NAME GOAL REMAIN BREACHED; do
+          > _sla_lines.tsv || true
+          if [ -s _sla_lines.tsv ]; then
+            while IFS=$'\t' read -r NAME GOAL REMAIN BREACHED; do
               [ -n "$NAME" ] || continue
               printf -- "- **%s** → Objetivo: %s · Restante/Estado: %s · Breach: %s\n" "$NAME" "$GOAL" "$REMAIN" "$BREACHED" >> sla.md
-            done
+            done < _sla_lines.tsv
+          fi
           if ! grep -q '^- ' sla.md; then
             echo "_No hay métricas de SLA disponibles para este ticket (o falta permiso de agente)_" >> sla.md
           fi
 
-      - name: Create Issue (IA limpia + Requisitos + Recomendaciones + SLA) + Labels IA
+      - name: Derive SLA severity label (sev:P1|P2|P3) from JSM priority
+        id: sev
+        env:
+          PRIORITY: ${{ steps.jsm.outputs.priority }}
+        run: |
+          set -euo pipefail
+          PRI="$(echo "${PRIORITY:-}" | tr '[:lower:]' '[:upper:]')"
+          if echo "$PRI" | grep -Eq 'CRIT|P1|URG|ALTA'; then
+            echo "label=sev:P1" >> "$GITHUB_OUTPUT"
+          elif echo "$PRI" | grep -Eq 'MED|P2|HIGH'; then
+            echo "label=sev:P2" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=sev:P3" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Issue (IA limpia + Requisitos + Recomendaciones + SLA) + Labels IA + SLA
         id: create_issue
         uses: actions/github-script@v7
         env:
@@ -335,6 +346,7 @@ jobs:
           REPORTER:      ${{ steps.jsm.outputs.reporter }}
           AI_JSON:       ${{ steps.parse_ai.outputs.json }}
           AI_MD_CORE:    ${{ steps.sanitize_ai.outputs.ai_core }}
+          SEV_LABEL:     ${{ steps.sev.outputs.label }}
         with:
           script: |
             const fs=require('fs');
@@ -385,7 +397,7 @@ jobs:
 
             const body=[head, aiMd, reqs, recs, sla].join('\n\n');
 
-            // ----- Labels IA: aplicar y crear si faltan (lista blanca) -----
+            // ----- Labels IA + SLA -----
             const allowed = new Set([
               'bug','documentation','duplicate','enhancement',
               'good first issue','help wanted','invalid','question','wontfix'
@@ -395,7 +407,9 @@ jobs:
               owner:context.repo.owner, repo:context.repo.repo, per_page:200
             });
             const existing = new Map(repoLabels.map(l=>[l.name.toLowerCase(), l.name]));
-            const finalLabels = new Set(['from-jsm','triage','agent-ready']);
+
+            // Base labels
+            const finalLabels = new Set(['from-jsm','triage','agent-ready', process.env.SEV_LABEL]);
 
             // Crea labels faltantes SOLO si están en la lista blanca
             for (const l of want) {
@@ -408,16 +422,14 @@ jobs:
                     name:l, color:'A3A3A3', description:'Auto-creado por IA (whitelist)'
                   });
                   finalLabels.add(created.data.name);
-                } catch (e) {
-                  // si no se pudo crear (permisos), ignorar
-                }
+                } catch (e) { /* ignore */ }
               }
             }
 
             const create=await github.rest.issues.create({
               owner:context.repo.owner, repo:context.repo.repo,
               title:`[${process.env.ISSUE_KEY}] ${process.env.SUMMARY}`,
-              body, labels:[...finalLabels]
+              body, labels:[...finalLabels].filter(Boolean)
             });
             core.setOutput('number', create.data.number);
 
@@ -438,5 +450,20 @@ jobs:
           if [ "$CODE" != "201" ] && [ "$CODE" != "200" ]; then
             echo "No se pudo publicar el comentario interno en JSM (HTTP $CODE):"
             cat /tmp/jsm_resp.json || true
-            # no fallar la corrida
           fi
+
+      - name: Copilot quick-link comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = +'${{ steps.create_issue.outputs.number }}';
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/issues/${issueNumber}`;
+            const body = [
+              '### Copilot (Coding Agent)',
+              `➡️ [Asignar a Copilot](${url}) — abre el issue y usa el botón **Use Copilot** / **Assign to Copilot**.`,
+              'El brief y contexto están listos en el cuerpo del issue.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: issueNumber, body
+            });
