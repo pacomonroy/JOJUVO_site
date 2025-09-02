@@ -58,7 +58,7 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-2 text-gray-300">
                 <Heart className="w-4 h-4 text-golden-400" />
-                <span className="text-sm">8:00 - 19:00 hrs</span>
+                <span className="text-sm">9:00 - 18:30 hrs</span>
               </div>
               <div className="flex items-center gap-2 text-gray-300">
                 <Heart className="w-4 h-4 text-golden-400" />

@@ -24,7 +24,7 @@ export function ContactSection() {
       icon: MapPin,
       title: "Ubicación",
       info: "Expo Santa Fe, CDMX",
-      description: "4 de octubre, 8:00 - 19:00hrs"
+      description: "4 de octubre, 9:00 - 18:30hrs"
     },
     {
       icon: MessageCircle, 

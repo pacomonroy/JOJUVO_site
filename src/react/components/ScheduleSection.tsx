@@ -9,84 +9,63 @@ export function ScheduleSection() {
 
   const scheduleItems = [
     {
-      time: "8:00",
-      title: "Llegada, registro, visita de stands",
-      description: "Recepción de participantes y exploración de stands",
-      icon: Users,
-      color: "bg-blue-100 text-blue-600"
-    },
-    {
       time: "9:00",
-      title: "Adoración Eucarística",
-      description: "Momento de oración y encuentro con Jesús Sacramentado",
-      icon: Heart,
-      color: "bg-purple-100 text-purple-600"
-    },
-    {
-      time: "10:00",
-      title: "Misa con Mons. Francisco Javier Acero",
-      description: "Celebración Eucarística con el obispo auxiliar de la Arquidiócesis de México",
+      title: "Registro, bienvenida y Santa Misa",
+      description: "Recepción de participantes y celebración eucarística",
       icon: Heart,
       color: "bg-golden-100 text-golden-600"
     },
     {
-      time: "11:30",
-      title: "Inicio de actividades",
-      description: "Bienvenida oficial al evento",
-      icon: Users,
-      color: "bg-green-100 text-green-600"
-    },
-    {
       time: "11:45",
-      title: "Conferencia inicial",
-      description: "Charla magistral de apertura",
+      title: "Conferencia magna",
+      description: "Charla magistral principal",
       icon: Mic,
       color: "bg-indigo-100 text-indigo-600"
     },
     {
-      time: "12:05",
-      title: "Break",
-      description: "Tiempo libre y networking",
+      time: "12:30",
+      title: "Talleres simultáneos #1",
+      description: "Primera sesión de talleres formativos especializados",
+      icon: BookOpen,
+      color: "bg-blue-100 text-blue-600"
+    },
+    {
+      time: "13:30",
+      title: "Descanso para comer y visitar stands",
+      description: "Tiempo para alimentarse y explorar los stands",
       icon: Coffee,
       color: "bg-orange-100 text-orange-600"
     },
     {
-      time: "12:30",
-      title: "Talleres simultáneos",
-      description: "Sesiones formativas especializadas",
+      time: "15:00",
+      title: "Talleres simultáneos #2",
+      description: "Segunda sesión de talleres formativos especializados",
       icon: BookOpen,
       color: "bg-teal-100 text-teal-600"
     },
     {
-      time: "13:30",
-      title: "Comida, visitar la capilla y los stands",
-      description: "Tiempo para alimentarse y explorar",
+      time: "16:00",
+      title: "Actividades en el salón principal",
+      description: "Dinámicas y actividades comunitarias",
       icon: Users,
-      color: "bg-red-100 text-red-600"
+      color: "bg-green-100 text-green-600"
     },
     {
-      time: "15:00",
-      title: "Activación y conferencias",
-      description: "Dinámicas y charlas de formación",
+      time: "16:30",
+      title: "Conferencia magna",
+      description: "Segunda conferencia magistral del día",
       icon: Mic,
+      color: "bg-purple-100 text-purple-600"
+    },
+    {
+      time: "17:30",
+      title: "Hora Santa \"Seamos uno\"",
+      description: "Momento de adoración eucarística y oración comunitaria",
+      icon: Heart,
       color: "bg-pink-100 text-pink-600"
     },
     {
-      time: "15:30",
-      title: "Keynote Speaker",
-      description: "Conferencia magistral principal",
-      icon: Mic,
-      color: "bg-cyan-100 text-cyan-600"
-    },
-    {
-      time: "16:00",
-      title: "Concierto de Hakuna",
-      description: "Música y alabanza en vivo",
-      icon: Music,
-      color: "bg-emerald-100 text-emerald-600"
-    },
-    {
-      time: "18:00",
+      time: "18:30",
       title: "Despedida",
       description: "Clausura del evento y bendición final",
       icon: Heart,
@@ -114,7 +93,7 @@ export function ScheduleSection() {
             Programa del Evento
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Un día completo de formación, oración, música y comunidad. Desde las 8:00 hasta las 19:00 horas.
+            Un día completo de formación, oración, música y comunidad. Desde las 9:00 hasta las 18:30 horas.
           </p>
           
           {/* CTA Button */}
