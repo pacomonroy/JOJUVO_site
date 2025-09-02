@@ -94,7 +94,7 @@ export function HeroSection() {
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-gray-300 text-sm md:text-base">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-              <span>4 de octubre • 8:00 - 19:00hrs</span>
+              <span>4 de octubre • 9:00 - 18:30hrs</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full"></div>

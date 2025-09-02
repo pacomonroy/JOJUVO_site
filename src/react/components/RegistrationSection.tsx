@@ -10,8 +10,8 @@ export function RegistrationSection() {
     },
     {
       icon: Clock,
-      title: "11 horas de contenido",
-      description: "Desde las 8:00 hasta las 19:00 horas"
+      title: "9.5 horas de contenido",
+      description: "Desde las 9:00 hasta las 18:30 horas"
     },
     {
       icon: MapPin,
