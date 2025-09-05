@@ -57,12 +57,12 @@ export function CountdownTimer() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: 1.2 }}
-      className="flex flex-col items-center"
+      className="flex flex-col items-center px-4"
     >
       <p className="text-lg text-gray-300 mb-6">Faltan para JOJUVO 2025</p>
       
       {/* Countdown display */}
-      <div className="flex items-center justify-center gap-4 md:gap-6">
+      <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-6 max-w-sm sm:max-w-lg mx-auto">
         {timeUnits.map((unit, index) => (
           <div key={unit.label} className="flex items-center">
             {/* Time unit container */}
@@ -72,17 +72,17 @@ export function CountdownTimer() {
               transition={{ delay: 0.2 + index * 0.1 }}
             >
               {/* Time container */}
-              <div className="bg-gray-700/60 backdrop-blur-sm border border-gray-600/50 rounded-2xl px-6 py-4 min-w-[100px] text-center">
+              <div className="bg-gray-700/60 backdrop-blur-sm border border-gray-600/50 rounded-2xl px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-4 min-w-[70px] sm:min-w-[80px] md:min-w-[100px] text-center">
                 <motion.div
                   key={unit.value}
                   initial={{ scale: 1.2, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.2 }}
-                  className="text-3xl md:text-4xl font-bold text-white mb-1"
+                  className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1"
                 >
                   {unit.value.toString().padStart(2, '0')}
                 </motion.div>
-                <div className="text-sm text-gray-300 uppercase tracking-wide">
+                <div className="text-xs sm:text-sm text-gray-300 uppercase tracking-wide">
                   {unit.label}
                 </div>
               </div>
