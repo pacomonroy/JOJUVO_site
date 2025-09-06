@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { Mail, Phone, MapPin, MessageCircle, Instagram, Facebook } from "lucide-react"
+import { Mail, Phone, MapPin, MessageCircle, Instagram } from "lucide-react"
 
 export function ContactSection() {
   const scrollToRegistration = () => {
@@ -17,7 +17,7 @@ export function ContactSection() {
     {
       icon: Phone,
       title: "Teléfono",
-      info: "+52 55 1234 5678",
+      info: "56 510 49989",
       description: "Llámanos de lunes a viernes"
     },
     {
@@ -29,7 +29,7 @@ export function ContactSection() {
     {
       icon: MessageCircle, 
       title: "Redes Sociales",
-      info: "@jojuvo2025",
+      info: "jojuvo_2do.decanato",
       description: "Síguenos para actualizaciones"
     }
   ]
@@ -199,11 +199,8 @@ export function ContactSection() {
                 <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
                   <h4 className="font-semibold text-gray-900 mb-3">Redes Sociales</h4>
                   <div className="flex gap-4">
-                    <a href="#" className="text-golden-600 hover:text-golden-700 transition-colors">
+                    <a href="https://www.instagram.com/jojuvo_2do.decanato?igsh=MTJmaGRzNXZwZWlzYg%3D%3D&utm_source=qr" className="text-golden-600 hover:text-golden-700 transition-colors" target="_blank" rel="noopener noreferrer">
                       <Instagram className="w-6 h-6" />
-                    </a>
-                    <a href="#" className="text-golden-600 hover:text-golden-700 transition-colors">
-                      <Facebook className="w-6 h-6" />
                     </a>
                   </div>
                   <p className="text-gray-600 text-sm mt-2">

@@ -153,7 +153,7 @@ export function RegistrationSection() {
                     type="tel"
                     required
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                    placeholder="+52 55 1234 5678"
+                    placeholder="56 510 49989"
                   />
                 </div>
 
