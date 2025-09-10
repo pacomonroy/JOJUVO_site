@@ -2,9 +2,8 @@ import { motion } from "motion/react"
 import { Mail, Phone, MapPin, MessageCircle, Instagram } from "lucide-react"
 
 export function ContactSection() {
-  const scrollToRegistration = () => {
-    const element = document.getElementById('inscripcion')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+  const buyTickets = () => {
+    window.open('https://boletos.jojuvo.com/', '_blank')
   }
 
   const contactMethods = [
@@ -55,12 +54,12 @@ export function ContactSection() {
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
             ¿Tienes preguntas sobre JOJUVO 2025? Estamos aquí para ayudarte. 
-            Contáctanos por cualquier medio o inscríbete directamente.
+            Contáctanos por cualquier medio o compra tu boleto directamente.
           </p>
           
           {/* Primary CTA */}
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-golden-500 hover:bg-golden-600 text-white px-10 py-4 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft"
             whileHover={{ 
               scale: 1.05,
@@ -68,7 +67,7 @@ export function ContactSection() {
             }}
             whileTap={{ scale: 0.95 }}
           >
-            Inscríbete ahora - $350
+            Comprar boletos - $350
           </motion.button>
         </motion.div>
 
@@ -209,17 +208,17 @@ export function ContactSection() {
                 </div>
 
                 <div className="bg-golden-50 rounded-xl p-6 border border-golden-200">
-                  <h4 className="font-semibold text-golden-800 mb-3">¿Listo para inscribirte?</h4>
+                  <h4 className="font-semibold text-golden-800 mb-3">¿Listo para comprar tu boleto?</h4>
                   <p className="text-golden-700 mb-4">
                     No esperes más, los cupos son limitados y se agotan rápido.
                   </p>
                   <motion.button
-                    onClick={scrollToRegistration}
+                    onClick={buyTickets}
                     className="bg-golden-500 hover:bg-golden-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 w-full"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Inscríbete ahora
+                    Comprar boletos
                   </motion.button>
                 </div>
               </div>

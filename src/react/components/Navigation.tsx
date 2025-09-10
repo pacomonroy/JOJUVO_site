@@ -16,7 +16,7 @@ export function Navigation() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['inicio', 'que-es', 'horario', 'inscripcion', 'contacto']
+      const sections = ['inicio', 'que-es', 'horario', 'boletos', 'contacto']
       const scrollPosition = window.scrollY + 100
 
       setIsScrolled(window.scrollY > 50)
@@ -40,7 +40,7 @@ export function Navigation() {
     { id: 'inicio', label: 'Inicio' },
     { id: 'que-es', label: '¿Qué es JOJUVO?' },
     { id: 'horario', label: 'Horario' },
-    { id: 'inscripcion', label: 'Inscripción' },
+    { id: 'boletos', label: 'Boletos' },
     { id: 'contacto', label: 'Contacto' }
   ]
 

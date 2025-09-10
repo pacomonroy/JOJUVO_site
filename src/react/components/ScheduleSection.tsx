@@ -2,9 +2,8 @@ import { motion } from "motion/react"
 import { Clock, MapPin, Users, Music, Coffee, BookOpen, Mic, Heart } from "lucide-react"
 
 export function ScheduleSection() {
-  const scrollToRegistration = () => {
-    const element = document.getElementById('inscripcion')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+  const buyTickets = () => {
+    window.open('https://boletos.jojuvo.com/', '_blank')
   }
 
   const scheduleItems = [
@@ -98,7 +97,7 @@ export function ScheduleSection() {
           
           {/* CTA Button */}
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-golden-500 hover:bg-golden-600 text-white px-8 py-4 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft"
             whileHover={{ 
               scale: 1.05,
@@ -106,7 +105,7 @@ export function ScheduleSection() {
             }}
             whileTap={{ scale: 0.95 }}
           >
-            Reserva tu lugar
+            Comprar boletos
           </motion.button>
         </motion.div>
 
@@ -170,12 +169,12 @@ export function ScheduleSection() {
             ¡No te pierdas ningún momento de este día especial!
           </p>
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-transparent border-2 border-golden-500 text-golden-600 hover:bg-golden-500 hover:text-white px-8 py-3 rounded-lg font-medium transition-all duration-200"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Inscríbete ahora
+            Comprar boletos
           </motion.button>
         </motion.div>
       </div>

@@ -21,7 +21,7 @@ export function RegistrationSection() {
   ]
 
   return (
-    <section id="inscripcion" className="py-20 bg-gray-900 relative overflow-hidden">
+    <section id="boletos" className="py-20 bg-gray-900 relative overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-gradient-to-br from-golden-900 via-golden-800 to-golden-900"></div>
@@ -37,7 +37,7 @@ export function RegistrationSection() {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Inscripción
+            Boletos
           </h2>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             Asegura tu lugar en esta experiencia única de fe, formación y comunidad.
@@ -93,94 +93,36 @@ export function RegistrationSection() {
             </div>
           </motion.div>
 
-          {/* Registration Form */}
+          {/* Ticket Purchase CTA */}
           <motion.div
             initial={{ opacity: 0, x: 50 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <div className="bg-white rounded-2xl p-8 shadow-xl">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-                Formulario de Inscripción
+            <div className="bg-white rounded-2xl p-8 shadow-xl text-center">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                ¡Compra tu boleto ahora!
               </h3>
               
-              <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre completo *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                      placeholder="Tu nombre completo"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Edad *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="15"
-                      max="35"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                      placeholder="Tu edad"
-                    />
-                  </div>
-                </div>
+              <p className="text-lg text-gray-700 mb-8">
+                Asegura tu lugar en esta experiencia única de fe, formación y comunidad.
+              </p>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Correo electrónico *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                    placeholder="tu@email.com"
-                  />
-                </div>
+              <motion.a
+                href="https://boletos.jojuvo.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block w-full bg-golden-500 hover:bg-golden-600 text-white py-4 px-8 rounded-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft text-lg"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Comprar boletos - $350 MXN
+              </motion.a>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Teléfono *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                    placeholder="55 123 45678"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Parroquia o comunidad
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-golden-500 focus:border-transparent"
-                    placeholder="Nombre de tu parroquia o comunidad"
-                  />
-                </div>
-
-                <motion.button
-                  type="submit"
-                  className="w-full bg-golden-500 hover:bg-golden-600 text-white py-4 rounded-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Proceder al pago - $350 MXN
-                </motion.button>
-              </form>
-
-              <div className="mt-6 text-center">
+              <div className="mt-6">
                 <p className="text-sm text-gray-600">
-                  Al inscribirte, aceptas participar en todas las actividades del evento según el programa establecido.
+                  Serás redirigido al sitio oficial de compra de boletos.
                 </p>
               </div>
             </div>
@@ -199,13 +141,16 @@ export function RegistrationSection() {
             Los cupos son limitados. ¡Asegura tu lugar hoy mismo!
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <motion.button
+            <motion.a
+              href="https://boletos.jojuvo.com/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="bg-golden-500 hover:bg-golden-600 text-white px-8 py-4 rounded-lg font-medium transition-colors duration-200 shadow-lg"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Inscríbete ahora
-            </motion.button>
+              Comprar boletos
+            </motion.a>
             <span className="text-golden-300 text-sm">
               ¡Solo $350 MXN por una experiencia inolvidable!
             </span>
