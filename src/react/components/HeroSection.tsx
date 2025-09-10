@@ -3,9 +3,8 @@ import { CountdownTimer } from './CountdownTimer'
 import { DivineBackground } from './DivineBackground'
 
 export function HeroSection() {
-  const scrollToRegistration = () => {
-    const element = document.getElementById('inscripcion')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+  const buyTickets = () => {
+    window.open('https://boletos.jojuvo.com/', '_blank')
   }
 
   return (
@@ -72,7 +71,7 @@ export function HeroSection() {
           className="mb-6"
         >
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-golden-500 hover:bg-golden-600 text-white px-8 py-4 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft mr-4"
             whileHover={{ 
               scale: 1.05,
@@ -80,7 +79,7 @@ export function HeroSection() {
             }}
             whileTap={{ scale: 0.95 }}
           >
-            Inscríbete ahora
+            Comprar boletos
           </motion.button>
         </motion.div>
 
@@ -105,7 +104,7 @@ export function HeroSection() {
               <span>Jóvenes católicos de 15-35 años</span>
             </div>
           </div>
-          <p className="text-golden-400">Aparta la fecha, inscripciones ya abiertas</p>
+          <p className="text-golden-400">Aparta la fecha, boletos ya disponibles</p>
           
           {/* Additional CTA button */}
           <motion.div
@@ -115,7 +114,7 @@ export function HeroSection() {
             className="pt-4"
           >
             <motion.button
-              onClick={scrollToRegistration}
+              onClick={buyTickets}
               className="bg-transparent border-2 border-golden-400 text-golden-400 hover:bg-golden-400 hover:text-white px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

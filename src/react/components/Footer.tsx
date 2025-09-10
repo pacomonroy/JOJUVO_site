@@ -2,9 +2,8 @@ import { motion } from "motion/react"
 import { Heart, Mail, Phone, MapPin, Instagram } from "lucide-react"
 
 export function Footer() {
-  const scrollToRegistration = () => {
-    const element = document.getElementById('inscripcion')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+  const buyTickets = () => {
+    window.open('https://boletos.jojuvo.com/', '_blank')
   }
 
   return (
@@ -30,12 +29,12 @@ export function Footer() {
               Un encuentro que transformará tu vida y fortalecerá tu fe católica.
             </p>
             <motion.button
-              onClick={scrollToRegistration}
+              onClick={buyTickets}
               className="bg-golden-500 hover:bg-golden-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-lg"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              Inscríbete ahora
+              Comprar boletos
             </motion.button>
           </motion.div>
 
@@ -105,12 +104,12 @@ export function Footer() {
             ¿Listo para transformar el mundo y llenar el cielo?
           </p>
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-transparent border-2 border-golden-400 text-golden-400 hover:bg-golden-400 hover:text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 mb-6"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Inscríbete ahora - $350 MXN
+            Comprar boletos - $350 MXN
           </motion.button>
         </motion.div>
 

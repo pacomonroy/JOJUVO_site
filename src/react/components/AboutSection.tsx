@@ -4,9 +4,8 @@ const image1 = "/images/placeholder-1.jpg"
 const image2 = "/images/placeholder-2.jpg"
 
 export function AboutSection() {  
-  const scrollToRegistration = () => {
-    const element = document.getElementById('inscripcion')
-    if (element) element.scrollIntoView({ behavior: 'smooth' })
+  const buyTickets = () => {
+    window.open('https://boletos.jojuvo.com/', '_blank')
   }
 
   const features = [
@@ -92,7 +91,7 @@ export function AboutSection() {
           className="text-center mb-16"
         >
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-golden-500 hover:bg-golden-600 text-white px-8 py-4 rounded-lg text-lg font-medium transition-colors duration-200 shadow-lg divine-glow-soft"
             whileHover={{ 
               scale: 1.05,
@@ -100,7 +99,7 @@ export function AboutSection() {
             }}
             whileTap={{ scale: 0.95 }}
           >
-            ¡Únete a nosotros!
+            ¡Comprar boletos!
           </motion.button>
         </motion.div>
 
@@ -140,12 +139,12 @@ export function AboutSection() {
             Únete a cientos de jóvenes católicos que están transformando el mundo con el Evangelio.
           </p>
           <motion.button
-            onClick={scrollToRegistration}
+            onClick={buyTickets}
             className="bg-transparent border-2 border-golden-500 text-golden-600 hover:bg-golden-500 hover:text-white px-8 py-3 rounded-lg font-medium transition-all duration-200"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Inscríbete ahora
+            Comprar boletos
           </motion.button>
         </motion.div>
       </div>
