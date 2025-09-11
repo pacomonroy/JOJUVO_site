@@ -37,9 +37,9 @@ Este Jojuvo es para ti, para que salgas con fuego en el corazón y un compromiso
             >
               <div className="relative mb-4 mx-auto w-32 h-32 md:w-40 md:h-40">
                 <img
-                  src="/images/placeholder-1.jpg"
+                  src="/images/bishop-francisco-javier-acero.jpg"
                   alt="Mons. Francisco Javier Acero, Obispo Auxiliar de la Arquidiócesis de México"
-                  className="w-full h-full object-cover rounded-full shadow-lg border-4 border-golden-200"
+                  className="w-full h-full object-cover object-top rounded-full shadow-lg border-4 border-golden-200"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/placeholder-1.jpg"; }}
                 />
                 <div className="absolute -top-1 -right-1 w-8 h-8 bg-golden-500 rounded-full flex items-center justify-center">
