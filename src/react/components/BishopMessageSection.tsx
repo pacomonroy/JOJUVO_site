@@ -37,7 +37,7 @@ Este Jojuvo es para ti, para que salgas con fuego en el corazón y un compromiso
             >
               <div className="relative mb-4 mx-auto w-32 h-32 md:w-40 md:h-40">
                 <img
-                  src="/images/bishop-francisco-javier-acero.jpg"
+                  src="https://agustinosrecoletos.org/wp-content/uploads/2023/05/31-2-683x1024.jpg"
                   alt="Mons. Francisco Javier Acero, Obispo Auxiliar de la Arquidiócesis de México"
                   className="w-full h-full object-cover object-top rounded-full shadow-lg border-4 border-golden-200"
                   onError={(e) => { 
