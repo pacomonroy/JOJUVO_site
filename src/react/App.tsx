@@ -1,5 +1,6 @@
 import { Navigation } from './components/Navigation'
 import { HeroSection } from './components/HeroSection'
+import { BishopMessageSection } from './components/BishopMessageSection'
 import { AboutSection } from './components/AboutSection'
 import { ScheduleSection } from './components/ScheduleSection'
 import { RegistrationSection } from './components/RegistrationSection'
@@ -16,6 +17,7 @@ export default function App() {
       <Navigation />
       <main>
         <HeroSection />
+        <BishopMessageSection />
         <AboutSection />
         <ScheduleSection />
         <RegistrationSection />
