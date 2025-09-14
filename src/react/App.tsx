@@ -3,6 +3,7 @@ import { HeroSection } from './components/HeroSection'
 import { BishopMessageSection } from './components/BishopMessageSection'
 import { AboutSection } from './components/AboutSection'
 import { ScheduleSection } from './components/ScheduleSection'
+import { SpeakersSection } from './components/SpeakersSection'
 import { RegistrationSection } from './components/RegistrationSection'
 import { ContactSection } from './components/ContactSection'
 import { Footer } from './components/Footer'
@@ -20,6 +21,7 @@ export default function App() {
         <BishopMessageSection />
         <AboutSection />
         <ScheduleSection />
+        <SpeakersSection />
         <RegistrationSection />
         <ContactSection />
       </main>

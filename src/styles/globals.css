@@ -295,7 +295,7 @@ html {
 .divine-layer-navigation { z-index: 50; }
 .divine-layer-content { z-index: 10; }
 
-/* Divine particles animation keyframes */
+  /* Divine particles animation keyframes */
 @keyframes divine-float {
   0%, 100% { transform: translateY(0px) scale(1); opacity: 0.3; }
   50% { transform: translateY(-20px) scale(1.1); opacity: 0.6; }
@@ -320,6 +320,15 @@ html {
     box-shadow: 0 0 12px var(--golden-400), 0 0 24px var(--golden-300);
     opacity: 1;
   }
+}
+
+/* Text truncation utility */
+.line-clamp-6 {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Apply animations */
