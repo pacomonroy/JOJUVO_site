@@ -73,7 +73,7 @@ export function SpeakersSection() {
             Conferencistas
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Conoce a los extraordinarios ponentes que compartirán su sabiduría y experiencia para inspirar y formar a los jóvenes católicos.
+            Conoce a los extraordinarios ponentes que compartirán su testimonio y experiencia para inspirar y formar a los jóvenes católicos.
           </p>
         </motion.div>
 
