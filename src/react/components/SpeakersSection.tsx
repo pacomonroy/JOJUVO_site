@@ -63,6 +63,30 @@ export function SpeakersSection() {
       bio: "Médico por la Universidad Panamericana (UP). Psiquiatra por el Instituto Nacional de Psiquiatría. Miembro de la Asociación Psiquiátrica Mexicana y la American Psychiatric Association. Médico adscrito en el Centro Médico ABC. Profesor titular de la asignatura: \"Habilidades de comunicación\" en la Escuela de Medicina de la UP. Profesor invitado en el Instituto Panamericano de Alta Dirección de Empresas (IPADE). Ha impartido más de 400 conferencias sobre motivación, Resiliencia, bienestar, gratitud e inclusión de personas con discapacidad. Atleta en el Comité Paralímpico Mexicano en la disciplina de lanzamiento de clava, Clasificación F51. Subcampeón Nacional.",
       imageUrl: "/images/Conferencista 6.jpg",
       placeholder: "JV"
+    },
+    {
+      id: "francisco-laguardia",
+      name: "Francisco Laguardia Ahued",
+      conferenceTitle: "El propósito de Dios para nuestras vidas",
+      bio: "Francisco se ha desempeñado en el sector financiero y de inversiones en los últimos 16 años. Es socio de NSC Asesores, la mayor y más antigua firma de Asesoría Independiente en Inversiones en México. Participa activamente en comités y consejos familiares y corporativos brindando asesoría patrimonial y de inversiones. Da clases en la Universidad Anáhuac de temas vinculados con finanzas personales y proyectos de inversión. A la par participa en distintos proyectos apostólicos. Está convencido de que nuestra profesión es un medio para algo más; y que todos estamos llamados a trascender. Ha profundizado y dado conferencias de temas morales y de fe cristiana cómo: El Propósito de Dios en Nuestras Vidas; Escuchando la Voz de Dios; El Significado de La Cruz; La Ciencia y la relación con la Fe Cristiana; entre otros",
+      imageUrl: "/images/Conferencista 7.jpg",
+      placeholder: "FL"
+    },
+    {
+      id: "monica-bernardo-banos",
+      name: "Monica y Bernardo Baños",
+      conferenceTitle: "¿Es o no es la pareja adecuada para mí?",
+      bio: "Monica y Bernardo Baños están casados desde hace dos años y medio. Bernardo es comunicólogo y pedagogo. Monica es ingeniera y familiologa. Ambos son miembros del Regnum Christi. Apostólicamente, Mónica colabora en Formar Apóstoles donde ha podido poner sus talentos profesionales para la evangelización. Y Bernardo es cofundador del Centro Empresarial Católico donde forman apóstoles y líderes cristianos para la sociedad. Ambos coordinan el curso \"Novios en Misión\". Un curso que prepara a los novios a vivir mejor la misión apostólica del matrimonio desde ahora en su noviazgo. Ya tienen a su primer hijo, Jerónimo, y quieren seguir formando una familia santa.",
+      imageUrl: "/images/Conferencista 8.jpg",
+      placeholder: "MB"
+    },
+    {
+      id: "miriam-jose-manuel",
+      name: "Miriam Vazquez y José Manuel Tejeda",
+      conferenceTitle: "¿Regresar después de la muerte?",
+      bio: "El \"Sí\" que nació después de morir… y regresar a la vida. Tú que estás leyendo esto, respiras, caminas, sueñas… pero un día tu corazón se detendrá. La única certeza que tienes es que vas a morir. La gran pregunta es: ¿qué vas a hacer con tu vida antes de que eso ocurra? Miriam ya cruzó esa frontera. En el 2001 su corazón se apagó por completo. Murió. Y en ese instante vivió lo que pocos han visto: su juicio ante Dios. Pero no era el final… Dios la regresó, porque aún había una misión pendiente en este mundo. Junto con José Manuel, su esposo, formaron una familia de seis hijos, sostenidos por los sacramentos, por la fuerza de la Eucaristía y por el \"sí\" confiado de María. Lo que parecía el final se transformó en un inicio nuevo: decir \"sí a la vida\" en la alegría y en el dolor, en las pérdidas y en la esperanza. De ese \"sí\" brotó una misión que hoy sigue encendida: cada casa Mater Filius que se abre en el mundo es un lugar donde miles de madres y voluntarios han encontrado el camino, la verdad y la vida. La fe de un solo \"hágase\".",
+      imageUrl: "/images/Conferencista 9.jpg",
+      placeholder: "MJ"
     }
   ]
 
