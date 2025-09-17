@@ -9,23 +9,23 @@ export function ScheduleSection() {
   const scheduleItems = [
     {
       time: "9:00",
-      title: "Registro, bienvenida y Santa Misa",
-      description: "Recepción de participantes y celebración eucarística",
+      title: "Registro, bienvenida y conferencia inaugural",
+      description: "Recepción de participantes y conferencia de apertura",
       icon: Heart,
       color: "bg-golden-100 text-golden-600"
     },
     {
-      time: "11:45",
-      title: "Conferencia magna",
-      description: "Charla magistral principal",
+      time: "11:00",
+      title: "Conferencias simultáneas #1",
+      description: "Primera sesión de conferencias especializadas",
       icon: Mic,
       color: "bg-indigo-100 text-indigo-600"
     },
     {
-      time: "12:30",
-      title: "Talleres simultáneos #1",
-      description: "Primera sesión de talleres formativos especializados",
-      icon: BookOpen,
+      time: "12:15",
+      title: "Misa con el Obispo",
+      description: "Celebración eucarística presidida por el Obispo",
+      icon: Heart,
       color: "bg-blue-100 text-blue-600"
     },
     {
@@ -51,8 +51,8 @@ export function ScheduleSection() {
     },
     {
       time: "16:30",
-      title: "Conferencia magna",
-      description: "Segunda conferencia magistral del día",
+      title: "Conferencia magna: Testimonio de José Villela",
+      description: "Conferencia magistral con testimonio especial",
       icon: Mic,
       color: "bg-purple-100 text-purple-600"
     },
