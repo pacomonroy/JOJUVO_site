@@ -1,5 +1,6 @@
 import { motion } from "motion/react"
-import { User, BookOpen } from "lucide-react"
+import { User, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
+import { useState } from "react"
 
 interface Speaker {
   id: string
@@ -11,8 +12,22 @@ interface Speaker {
 }
 
 export function SpeakersSection() {
+  const [expandedSpeakers, setExpandedSpeakers] = useState<Set<string>>(new Set())
+  
   const buyTickets = () => {
     window.open('https://boletos.jojuvo.com/', '_blank')
+  }
+
+  const toggleBioExpansion = (speakerId: string) => {
+    setExpandedSpeakers(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(speakerId)) {
+        newSet.delete(speakerId)
+      } else {
+        newSet.add(speakerId)
+      }
+      return newSet
+    })
   }
 
   const speakers: Speaker[] = [
@@ -180,9 +195,37 @@ export function SpeakersSection() {
 
               {/* Bio */}
               <div className="text-gray-600 leading-relaxed text-sm">
-                <p className="line-clamp-6">
-                  {speaker.bio}
-                </p>
+                <motion.div
+                  initial={false}
+                  animate={{ 
+                    height: expandedSpeakers.has(speaker.id) ? "auto" : "auto"
+                  }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                >
+                  <p className={expandedSpeakers.has(speaker.id) ? "" : "line-clamp-6"}>
+                    {speaker.bio}
+                  </p>
+                </motion.div>
+                
+                {/* Show more/less button */}
+                <motion.button
+                  onClick={() => toggleBioExpansion(speaker.id)}
+                  className="mt-2 text-golden-600 hover:text-golden-700 text-sm font-medium flex items-center gap-1 transition-colors duration-200"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {expandedSpeakers.has(speaker.id) ? (
+                    <>
+                      Ver menos
+                      <ChevronUp className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      Ver más
+                      <ChevronDown className="w-4 h-4" />
+                    </>
+                  )}
+                </motion.button>
               </div>
 
               {/* Icon decoration */}
