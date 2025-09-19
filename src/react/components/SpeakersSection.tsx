@@ -33,7 +33,7 @@ export function SpeakersSection() {
   const speakers: Speaker[] = [
     {
       id: "ines-rodriguez",
-      name: "Inés Martínez",
+      name: "Inés Rodríguez",
       conferenceTitle: "Mujer: alma viva y corazón de la Iglesia",
       bio: "Abogada por la Universidad Anáhuac México, maestra en Derecho de las Empresas igualmente en la Universidad Anáhuac. Cuenta con un diplomado en Políticas Públicas con Perspectiva de Familia por el Instituto Pontificio Juan Pablo II. Directora de la Asociación Civil JUVI A.C. en la Ciudad de México. Coordinadora Nacional de la Secretaría de la Juventud del Movimiento Viva México. Conferencista en temas de feminidad, legislación mexicana, afectividad, noviazgo y matrimonio. Vocera de la Marcha a Favor de la Mujer y la Vida. Creadora de contenido en redes sociales.",
       imageUrl: "/images/Conferencista 1.jpg",
