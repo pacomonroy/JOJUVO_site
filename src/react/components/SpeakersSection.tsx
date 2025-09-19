@@ -34,7 +34,7 @@ export function SpeakersSection() {
     {
       id: "ines-rodriguez",
       name: "Inés Rodríguez",
-      conferenceTitle: "El rol de la mujer en la Iglesia",
+      conferenceTitle: "Mujer: alma viva y corazón de la Iglesia",
       bio: "Abogada por la Universidad Anáhuac México, maestra en Derecho de las Empresas igualmente en la Universidad Anáhuac. Cuenta con un diplomado en Políticas Públicas con Perspectiva de Familia por el Instituto Pontificio Juan Pablo II. Directora de la Asociación Civil JUVI A.C. en la Ciudad de México. Coordinadora Nacional de la Secretaría de la Juventud del Movimiento Viva México. Conferencista en temas de feminidad, legislación mexicana, afectividad, noviazgo y matrimonio. Vocera de la Marcha a Favor de la Mujer y la Vida. Creadora de contenido en redes sociales.",
       imageUrl: "/images/Conferencista 1.jpg",
       placeholder: "IR"
@@ -66,7 +66,7 @@ export function SpeakersSection() {
     {
       id: "gilberto-macias",
       name: "Gilberto Macías",
-      conferenceTitle: "Masculinidad y Machismo",
+      conferenceTitle: "La verdadera masculinidad",
       bio: "Gilberto Macías, es egresado de la Universidad Anáhuac, México de la licenciatura de negocios internacionales, y de la Maestría en sustentabilidad. Tiene Diplomados en la Universidad Panamericana, tecnológico de Monterrey Campus Santa Fe, Dale Carnegie información de líderes, coaching y oratoria, entre otros. Tiene 15 años de experiencia en el ramo profesional, 10 de ellos, ocupando puestos de liderazgo enfocado en desarrollo de equipos de alto potencial y transformación organizacional. Habiendo trabajado en posiciones de liderazgo en empresas top como Dow Chemical, BASF, Yara y Netafim. Es docente de la universidad, Anáhuac, en la facultad de economía y negocios en programas de liderazgo, trabajó también en la red de colegios Semper Altius. Es miembro del segundo grado del movimiento, Regnum Christi, desde el año 2007, fue delegado para la revisión de las constituciones, representando a México en el año 2017. Desde 2020 participa en el Bootcamp de masculinidad Braveheart en donde más de 300 personas han comenzado un plan de trabajo. En 2023, es investido como Caballero de la Orden Ecuestre del Santo Sepulcro y en 2025 es ascendido a Director de Sección Nueva Galicia (Guadalajara).",
       imageUrl: "/images/Conferencista 5.jpg",
       placeholder: "GM"
