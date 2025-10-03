@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
+import { Sun, Moon } from "lucide-react"
 
 export function Navigation() {
   const [activeSection, setActiveSection] = useState('inicio')
   const [isScrolled, setIsScrolled] = useState(false)
+  const [isDark, setIsDark] = useState(false)
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId)
@@ -13,6 +15,20 @@ export function Navigation() {
       element.scrollIntoView({ behavior: 'smooth' })
     }
   }
+
+  useEffect(() => {
+    // Check for saved theme preference or default to light mode
+    const savedTheme = localStorage.getItem('theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
+    
+    setIsDark(shouldBeDark)
+    if (shouldBeDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,6 +51,19 @@ export function Navigation() {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const toggleDarkMode = () => {
+    const newIsDark = !isDark
+    setIsDark(newIsDark)
+    
+    if (newIsDark) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
 
   const menuItems = [
     { id: 'inicio', label: 'Inicio' },
@@ -62,7 +91,7 @@ export function Navigation() {
             JOJUVO
           </motion.div>
           
-          <div className="hidden md:flex space-x-8">
+          <div className="hidden md:flex items-center space-x-8">
             {menuItems.map((item, index) => (
               <motion.button
                 key={item.id}
@@ -80,9 +109,40 @@ export function Navigation() {
                 {item.label}
               </motion.button>
             ))}
+            
+            <motion.button
+              onClick={toggleDarkMode}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                isScrolled 
+                  ? 'text-gray-700 hover:text-golden-600 hover:bg-gray-100' 
+                  : 'text-white hover:text-golden-300 hover:bg-white/10'
+              }`}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: menuItems.length * 0.1 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              aria-label="Cambiar modo de color"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </motion.button>
           </div>
 
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center space-x-4">
+            <motion.button
+              onClick={toggleDarkMode}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                isScrolled 
+                  ? 'text-gray-700 hover:text-golden-600 hover:bg-gray-100' 
+                  : 'text-white hover:text-golden-300 hover:bg-white/10'
+              }`}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              aria-label="Cambiar modo de color"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </motion.button>
+            
             <button className={isScrolled ? "text-gray-700" : "text-white"}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
