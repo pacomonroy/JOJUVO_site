@@ -27,7 +27,7 @@ export function AboutSection() {
   ]
 
   return (
-    <section id="que-es" className="py-20 bg-white relative overflow-hidden">
+    <section id="que-es" className="py-20 bg-white dark:bg-gray-800 relative overflow-hidden transition-colors duration-300">
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-gradient-to-br from-golden-100 to-golden-200"></div>
@@ -42,10 +42,10 @@ export function AboutSection() {
           transition={{ duration: 0.8 }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-6">
             ¿Qué es JOJUVO?
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
             Una experiencia única que busca unir, formar y fortalecer a los jóvenes como líderes y apóstoles católicos.
           </p>
         </motion.div>
@@ -112,15 +112,15 @@ export function AboutSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100"
+              className="bg-white dark:bg-gray-700 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-600"
             >
-              <div className="w-16 h-16 bg-golden-100 rounded-full flex items-center justify-center mb-6">
-                <feature.icon className="w-8 h-8 text-golden-600" />
+              <div className="w-16 h-16 bg-golden-100 dark:bg-golden-900/50 rounded-full flex items-center justify-center mb-6">
+                <feature.icon className="w-8 h-8 text-golden-600 dark:text-golden-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                 {feature.description}
               </p>
             </motion.div>
@@ -135,7 +135,7 @@ export function AboutSection() {
           transition={{ duration: 0.8, delay: 0.6 }}
           className="text-center mt-16"
         >
-          <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
             Únete a cientos de jóvenes católicos que están transformando el mundo con el Evangelio.
           </p>
           <motion.button

@@ -110,7 +110,7 @@ export function SpeakersSection() {
   }
 
   return (
-    <section id="conferencistas" className="py-20 bg-white relative overflow-hidden">
+    <section id="conferencistas" className="py-20 bg-white dark:bg-gray-800 relative overflow-hidden transition-colors duration-300">
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-gradient-to-br from-golden-100 to-golden-200"></div>

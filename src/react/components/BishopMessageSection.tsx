@@ -12,7 +12,7 @@ Este Jojuvo es para ti, para que salgas con fuego en el corazón y un compromiso
 ¡Espero encontrarlos a todos ahí! ¡No falten!`
 
   return (
-    <section id="mensaje-obispo" className="py-12 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
+    <section id="mensaje-obispo" className="py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 relative overflow-hidden transition-colors duration-300">
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-3">
         <div className="absolute inset-0 bg-gradient-to-br from-golden-50 to-golden-100"></div>

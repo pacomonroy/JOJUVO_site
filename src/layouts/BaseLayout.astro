@@ -30,6 +30,16 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? url).toString();
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
+    <!-- Dark mode initialization script (prevents flash) -->
+    <script is:inline>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (theme === 'dark' || (!theme && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <!-- Event JSON-LD -->
     <script type="application/ld+json">
       {JSON.stringify({
@@ -69,7 +79,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? url).toString();
     </script>
     <slot name="head" />
   </head>
-  <body class="min-h-screen antialiased bg-white text-gray-900">
+  <body class="min-h-screen antialiased bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
     <slot />
   </body>
 </html>
