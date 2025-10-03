@@ -26,6 +26,18 @@ export function HeroSection() {
       </div>
       
       <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-20">
+        {/* Welcome header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0 }}
+          className="mb-4"
+        >
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-golden-400 tracking-wide">
+            BIENVENIDO
+          </h2>
+        </motion.div>
+
         {/* Main JOJUVO branding */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
