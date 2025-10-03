@@ -73,7 +73,7 @@ export function ScheduleSection() {
   ]
 
   return (
-    <section id="horario" className="py-20 bg-gray-50 relative overflow-hidden">
+    <section id="horario" className="py-20 bg-gray-50 dark:bg-gray-900 relative overflow-hidden transition-colors duration-300">
       {/* Background decoration */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-gradient-to-br from-golden-100 to-golden-200"></div>
