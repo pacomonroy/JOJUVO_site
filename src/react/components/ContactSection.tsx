@@ -53,7 +53,7 @@ export function ContactSection() {
             Contáctanos
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            ¿Tienes preguntas sobre JOJUVO 2025? Estamos aquí para ayudarte. 
+            ¿Tienes preguntas sobre JOJUVOO 2025? Estamos aquí para ayudarte. 
             Contáctanos por cualquier medio o compra tu boleto directamente.
           </p>
           

@@ -1,6 +1,6 @@
-# JOJUVO 2025 — Astro site
+# JOJUVOO 2025 — Astro site
 
-A lightweight, content-focused site for JOJUVO 2025 (Jornada Juvenil Vocacional), built with Astro 4, React 18, and Tailwind CSS 3.
+A lightweight, content-focused site for JOJUVOO 2025 (Jornada Juvenil Vocacional), built with Astro 4, React 18, and Tailwind CSS 3.
 
 ## Tech stack
 - Astro ^4.15 with React integration
@@ -126,4 +126,4 @@ This is a CSS language service warning only. The Tailwind/PostCSS pipeline handl
 - Dark mode uses CSS variables in `globals.css`. If you prefer Tailwind’s built-in dark variant, set `darkMode: 'class'` in `tailwind.config.mjs` and add/remove a `.dark` class on the root element.
 
 ---
-Maintained for JOJUVO 2025. PRs and improvements welcome.
+Maintained for JOJUVOO 2025. PRs and improvements welcome.

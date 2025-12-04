@@ -38,7 +38,7 @@ export function Navigation() {
 
   const menuItems = [
     { id: 'inicio', label: 'Inicio' },
-    { id: 'que-es', label: '¿Qué es JOJUVO?' },
+    { id: 'que-es', label: '¿Qué es JOJUVOO?' },
     { id: 'horario', label: 'Horario' },
     { id: 'conferencistas', label: 'Conferencistas' },
     { id: 'boletos', label: 'Boletos' },
@@ -59,7 +59,7 @@ export function Navigation() {
             className="text-2xl font-bold text-golden-400"
             whileHover={{ scale: 1.05 }}
           >
-            JOJUVO
+            JOJUVOO
           </motion.div>
           
           <div className="hidden md:flex space-x-8">

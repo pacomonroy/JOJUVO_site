@@ -59,7 +59,7 @@ export function CountdownTimer() {
       transition={{ duration: 0.8, delay: 1.2 }}
       className="flex flex-col items-center px-4"
     >
-      <p className="text-lg text-gray-300 mb-6">Faltan para JOJUVO 2025</p>
+      <p className="text-lg text-gray-300 mb-6">Faltan para JOJUVOO 2025</p>
       
       {/* Countdown display */}
       <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-6 max-w-sm sm:max-w-lg mx-auto">

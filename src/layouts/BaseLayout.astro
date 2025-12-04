@@ -1,12 +1,12 @@
 ---
 import "../styles/globals.css";
 const {
-  title = "JOJUVO 2025 — Jornada Juvenil Vocacional",
+  title = "JOJUVOO 2025 — Jornada Juvenil Vocacional",
   description = "Evento católico juvenil en Expo Santa Fe, CDMX — 4 de octubre de 2025.",
   url = Astro.site?.toString() ?? "https://www.jojuvo.mx",
   image = "/og-image.png",
 } = Astro.props;
-const siteName = "JOJUVO 2025";
+const siteName = "JOJUVOO 2025";
 const canonical = new URL(Astro.url.pathname, Astro.site ?? url).toString();
 ---
 <html lang="es-MX">
@@ -35,7 +35,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? url).toString();
       {JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Event",
-        "name": "JOJUVO 2025 — Jornada Juvenil Vocacional",
+        "name": "JOJUVOO 2025 — Jornada Juvenil Vocacional",
         "startDate": "2025-10-04T09:00:00-06:00",
         "endDate": "2025-10-04T18:30:00-06:00",
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
