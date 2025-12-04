@@ -39,7 +39,7 @@ export function DivineCross() {
       // Position above hero title
       return {
         position: 'absolute' as const,
-        top: '35%', // Above the JOJUVO title
+        top: '35%', // Above the JOJUVOO title
         left: '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 25, // Above hero content

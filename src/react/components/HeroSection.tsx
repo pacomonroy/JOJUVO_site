@@ -26,7 +26,7 @@ export function HeroSection() {
       </div>
       
       <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-20">
-        {/* Main JOJUVO branding */}
+        {/* Main JOJUVOO branding */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -34,7 +34,7 @@ export function HeroSection() {
           className="mb-6"
         >
           <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-bold text-white tracking-tight mb-3 drop-shadow-lg">
-            JOJUVO 2025
+            JOJUVOO 2025
           </h1>
           <motion.p
             initial={{ opacity: 0 }}

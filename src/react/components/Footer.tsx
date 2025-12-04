@@ -23,7 +23,7 @@ export function Footer() {
             transition={{ duration: 0.6 }}
             className="md:col-span-2"
           >
-            <h3 className="text-3xl font-bold text-golden-400 mb-4">JOJUVO 2025</h3>
+            <h3 className="text-3xl font-bold text-golden-400 mb-4">JOJUVOO 2025</h3>
             <p className="text-gray-300 mb-6 max-w-md">
               Jornada Juvenil Vocacional, II Zona Pastoral, 2do decanato. 
               Un encuentro que transformará tu vida y fortalecerá tu fe católica.
@@ -126,7 +126,7 @@ export function Footer() {
             <Heart className="w-4 h-4 text-red-500" />
           </p>
           <p className="text-gray-500 text-xs mt-2">
-            © 2025 JOJUVO. Todos los derechos reservados.
+            © 2025 JOJUVOO. Todos los derechos reservados.
           </p>
         </motion.div>
       </div>

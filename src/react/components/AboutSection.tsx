@@ -43,7 +43,7 @@ export function AboutSection() {
           className="text-center mb-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            ¿Qué es JOJUVO?
+            ¿Qué es JOJUVOO?
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Una experiencia única que busca unir, formar y fortalecer a los jóvenes como líderes y apóstoles católicos.
@@ -61,7 +61,7 @@ export function AboutSection() {
           <div className="relative overflow-hidden rounded-2xl shadow-lg">
             <img 
               src={image1} 
-              alt="JOJUVO 2024 - Momento de adoración con música" 
+              alt="JOJUVOO 2024 - Momento de adoración con música" 
               className="w-full h-80 object-cover hover:scale-105 transition-transform duration-500"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/placeholder-1.png"; }}
             />
@@ -72,7 +72,7 @@ export function AboutSection() {
           <div className="relative overflow-hidden rounded-2xl shadow-lg">
             <img 
               src={image2} 
-              alt="JOJUVO 2024 - Jóvenes participando en conferencias" 
+              alt="JOJUVOO 2024 - Jóvenes participando en conferencias" 
               className="w-full h-80 object-cover hover:scale-105 transition-transform duration-500"
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/placeholder-1.png"; }}
             />
